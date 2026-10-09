@@ -1,4 +1,4 @@
-![Laravel Immutable Attributes — protect individual Eloquent columns from changes](.github/assets/github-banner-columns.png)
+![Laravel Immutable Attributes — protect individual Eloquent columns from changes](.github/assets/laravel-immutable-attributes.png)
 
 # Laravel Immutable Attributes
 

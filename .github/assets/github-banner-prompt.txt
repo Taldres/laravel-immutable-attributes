@@ -1,7 +1,0 @@
-Use case: ads-marketing
-Asset type: GitHub repository banner for the Laravel PHP package laravel-immutable-attributes.
-Primary request: A polished, restrained developer-tool banner, wide 2:1 landscape composition, ideally 1600 by 800 pixels. Dark charcoal background, Laravel-inspired warm red accents and warm white typography. Editorial graphic design, extremely crisp readable type, generous whitespace, no generic sci-fi look.
-Subject: An elegant red dimensional padlock integrated into a small abstract stack of database attribute tiles on the right, representing Eloquent attributes locked after creation. Subtle precise thin-line grid, understated depth and matte materials.
-Composition: Left two thirds reserved for typography, right third for the lock illustration. All content safely inset from edges. On the left a small red uppercase label "LARAVEL PACKAGE", followed by large bold sans-serif title split over two lines: first line "Immutable", second line "Attributes". Beneath it the exact readable monospaced package name "laravel-immutable-attributes". Near the bottom left include one small code-like capsule with the exact text "#[Immutable]". No other text.
-Text (verbatim): "LARAVEL PACKAGE", "Immutable", "Attributes", "laravel-immutable-attributes", "#[Immutable]".
-Constraints: Beautiful professional open-source repository artwork. Keep package-name spelling exact. No watermark, no mock browser, no GitHub logo, no fake UI, no decorative unreadable code, no excessive glow, no clutter. Solid opaque background.
