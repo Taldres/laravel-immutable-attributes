@@ -16,6 +16,10 @@ it('drops duplicate columns', function () {
     expect((new Immutable('number', ['number', 'total']))->columns)->toBe(['number', 'total']);
 });
 
-it('covers the whole model without columns', function () {
+it('covers the whole model without arguments', function () {
     expect((new Immutable)->columns)->toBe(['*']);
+});
+
+it('covers nothing with an empty list', function () {
+    expect((new Immutable([]))->columns)->toBe([]);
 });
