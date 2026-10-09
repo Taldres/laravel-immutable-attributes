@@ -6,7 +6,7 @@ namespace Taldres\ImmutableAttributes\Tests\Fixtures\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Taldres\ImmutableAttributes\Attributes\Immutable;
+use Taldres\ImmutableAttributes\Attributes\ImmutableModel;
 use Taldres\ImmutableAttributes\Concerns\GuardsImmutableAttributes;
 
 /**
@@ -14,7 +14,7 @@ use Taldres\ImmutableAttributes\Concerns\GuardsImmutableAttributes;
  * @property int $amount
  * @property string|null $memo
  */
-#[Immutable]
+#[ImmutableModel]
 class SoftDeletingLedgerEntry extends Model
 {
     use GuardsImmutableAttributes;

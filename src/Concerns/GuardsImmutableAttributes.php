@@ -9,6 +9,7 @@ use ReflectionAttribute;
 use ReflectionClass;
 use Taldres\ImmutableAttributes\Attributes\Immutable;
 use Taldres\ImmutableAttributes\Exceptions\ImmutableAttributeException;
+use Taldres\ImmutableAttributes\Exceptions\InvalidImmutableColumnsException;
 
 /**
  * @phpstan-require-extends Model
@@ -22,6 +23,10 @@ trait GuardsImmutableAttributes
 
     public static function bootGuardsImmutableAttributes(): void
     {
+        // Resolve now, so a misconfigured #[Immutable] fails when the model
+        // boots rather than on its first update.
+        static::$resolvedImmutableAttributes[static::class] ??= static::resolveImmutableAttributes();
+
         // Model increment() and decrement() write through their own query and
         // never reach getDirtyForUpdate(), but they do fire "updating".
         static::updating(static function (self $model): void {
@@ -84,19 +89,26 @@ trait GuardsImmutableAttributes
     }
 
     /**
-     * Collects #[Immutable] from the class, the traits it uses, and its parents.
+     * Collects #[Immutable] and its subclasses, such as #[ImmutableModel], from
+     * the class, the traits it uses, and its parents.
      *
      * @template TClass of object
      *
      * @param  ReflectionClass<TClass>  $class
      * @return list<string>
+     *
+     * @throws InvalidImmutableColumnsException
      */
     private static function immutableColumnsDeclaredOn(ReflectionClass $class): array
     {
         $columns = [];
 
         foreach ($class->getAttributes(Immutable::class, ReflectionAttribute::IS_INSTANCEOF) as $attribute) {
-            array_push($columns, ...$attribute->newInstance()->columns);
+            try {
+                array_push($columns, ...$attribute->newInstance()->columns);
+            } catch (InvalidImmutableColumnsException $e) {
+                throw $e->declaredOn($class->getName());
+            }
         }
 
         foreach ($class->getTraits() as $trait) {

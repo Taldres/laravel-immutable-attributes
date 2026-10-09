@@ -24,6 +24,7 @@ return new class extends Migration
 
         Schema::create('ledger_entries', function (Blueprint $table): void {
             $table->id();
+            $table->unsignedBigInteger('invoice_id')->nullable();
             $table->integer('amount');
             $table->string('memo')->nullable();
             $table->softDeletes();

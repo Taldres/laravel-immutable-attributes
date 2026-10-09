@@ -5,22 +5,16 @@ declare(strict_types=1);
 namespace Taldres\ImmutableAttributes\Tests\Fixtures\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Taldres\ImmutableAttributes\Attributes\Immutable;
 use Taldres\ImmutableAttributes\Concerns\GuardsImmutableAttributes;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Concerns\HasEmptyImmutableList;
 
 /**
- * @property int $id
- * @property int $amount
- * @property string|null $memo
+ * Fails when it boots: its trait declares #[Immutable] without a column.
  */
-#[Immutable([])]
-class DraftLedgerEntry extends Model
+class MisdeclaredLedgerEntry extends Model
 {
     use GuardsImmutableAttributes;
-
-    public $timestamps = false;
+    use HasEmptyImmutableList;
 
     protected $table = 'ledger_entries';
-
-    protected $guarded = [];
 }

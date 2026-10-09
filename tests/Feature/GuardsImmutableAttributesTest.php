@@ -6,16 +6,20 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Taldres\ImmutableAttributes\Attributes\Immutable;
+use Taldres\ImmutableAttributes\Attributes\ImmutableModel;
 use Taldres\ImmutableAttributes\Concerns\GuardsImmutableAttributes;
 use Taldres\ImmutableAttributes\Exceptions\ImmutableAttributeException;
+use Taldres\ImmutableAttributes\Exceptions\InvalidImmutableColumnsException;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Concerns\HasEmptyImmutableList;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\AuditEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\ConfiguredInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\CreditNote;
-use Taldres\ImmutableAttributes\Tests\Fixtures\Models\DraftLedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\Invoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\LedgerEntry;
-use Taldres\ImmutableAttributes\Tests\Fixtures\Models\ReopenedInvoice;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\LockedInvoice;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\MisdeclaredLedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\SoftDeletingLedgerEntry;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\TouchingLedgerEntry;
 
 /**
  * @param  array<string, mixed>  $attributes
@@ -206,6 +210,17 @@ describe('incrementing', function () {
 
         expect($invoice->fresh()?->total)->toBe(1050);
     });
+
+    it('throws on incrementEach() and decrementEach()', function (Closure $change) {
+        $invoice = invoice();
+
+        expect(fn () => $change($invoice))->toThrow(ImmutableAttributeException::class);
+        expect(DB::table('invoices')->value('customer_id'))->toBe(7)
+            ->and(storedNumber($invoice))->toBe('INV-001');
+    })->with([
+        'incrementEach()' => fn (Invoice $invoice) => $invoice->incrementEach(['customer_id' => 1]),
+        'decrementEach() with extra columns' => fn (Invoice $invoice) => $invoice->decrementEach(['total' => 1], ['number' => 'INV-999']),
+    ])->skip(! method_exists(Model::class, 'incrementEach'), 'Model::incrementEach() arrived in Laravel 13.3.');
 });
 
 describe('the whole model', function () {
@@ -226,6 +241,30 @@ describe('the whole model', function () {
         $entry = LedgerEntry::query()->create(['amount' => 100]);
 
         expect($entry->save())->toBeTrue();
+    });
+
+    it('throws on touch()', function () {
+        $invoice = LockedInvoice::query()->create([
+            'number' => 'INV-001',
+            'customer_id' => 7,
+            'issued_at' => now(),
+        ]);
+
+        $this->travel(5)->minutes();
+
+        expect(fn () => $invoice->touch())
+            ->toThrow(function (ImmutableAttributeException $e): void {
+                expect($e->attributes)->toBe(['updated_at']);
+            });
+    });
+
+    it('throws on restore() once soft deleted', function () {
+        $entry = SoftDeletingLedgerEntry::query()->create(['amount' => 100]);
+
+        $entry->delete();
+
+        expect(fn () => $entry->restore())->toThrow(ImmutableAttributeException::class, '[deleted_at]');
+        expect(DB::table('ledger_entries')->value('deleted_at'))->not->toBeNull();
     });
 });
 
@@ -282,41 +321,28 @@ describe('resolving the attributes', function () {
         expect($model->getImmutableAttributes())->toBe([]);
     });
 
-    it('guards everything when a wildcard sits next to columns', function (Model $model) {
+    it('guards everything when #[ImmutableModel] meets column lists', function (Model $model) {
         expect($model->isImmutableAttribute('amount'))->toBeTrue();
     })->with([
-        'a child adds a column to a wildcard parent' => fn () => new #[Immutable('memo')] class extends LedgerEntry {},
-        'a column next to the wildcard' => fn () => new #[Immutable('memo', '*')] class extends Model
+        'a child adds columns to a whole-model parent' => fn () => new #[Immutable('memo')] class extends LedgerEntry {},
+        'both on one class' => fn () => new #[Immutable('memo')] #[ImmutableModel] class extends Model
         {
             use GuardsImmutableAttributes;
         },
     ]);
 
-    it('reads attributes that extend #[Immutable]', function () {
+    it('rejects #[Immutable] without columns when the model boots, naming where it is declared', function () {
+        expect(fn () => new MisdeclaredLedgerEntry)->toThrow(
+            InvalidImmutableColumnsException::class,
+            'Use #[ImmutableModel] to guard the whole model. Declared on ['.HasEmptyImmutableList::class.'].',
+        );
+    });
+
+    it('reads presets that extend #[ImmutableModel]', function () {
         $entry = AuditEntry::query()->create(['amount' => 100]);
 
         expect($entry->getImmutableAttributes())->toBe(['*']);
         expect(fn () => $entry->update(['memo' => 'correction']))->toThrow(ImmutableAttributeException::class);
-    });
-
-    it('guards nothing with an empty list', function () {
-        $entry = DraftLedgerEntry::query()->create(['amount' => 100]);
-
-        $entry->update(['amount' => 120, 'memo' => 'corrected']);
-
-        expect($entry->getImmutableAttributes())->toBe([])
-            ->and($entry->fresh()?->amount)->toBe(120);
-    });
-
-    it('keeps the parent attributes when a child declares an empty list', function () {
-        $invoice = ReopenedInvoice::query()->create([
-            'number' => 'INV-001',
-            'customer_id' => 7,
-            'issued_at' => now(),
-        ]);
-
-        expect($invoice->getImmutableAttributes())->toBe(['number', 'customer_id', 'issued_at', 'options']);
-        expect(fn () => $invoice->update(['number' => 'INV-999']))->toThrow(ImmutableAttributeException::class);
     });
 
     it('tells whether an attribute is immutable', function () {
@@ -391,6 +417,37 @@ describe('outside the model', function () {
         $invoice->decrementQuietly('customer_id', 2);
 
         expect(DB::table('invoices')->value('customer_id'))->toBe(6);
+    });
+
+    it('leaves increment() inside Model::withoutEvents() alone', function () {
+        $invoice = invoice();
+
+        Model::withoutEvents(fn () => $invoice->increment('customer_id'));
+
+        expect(DB::table('invoices')->value('customer_id'))->toBe(8);
+    });
+
+    it('leaves incrementEachQuietly() and decrementEachQuietly() alone', function () {
+        $invoice = invoice();
+
+        $invoice->incrementEachQuietly(['customer_id' => 2]);
+        $invoice->decrementEachQuietly(['customer_id' => 1]);
+
+        expect(DB::table('invoices')->value('customer_id'))->toBe(8);
+    })->skip(! method_exists(Model::class, 'incrementEachQuietly'), 'Model::incrementEachQuietly() arrived in Laravel 13.20.');
+
+    it('leaves parent timestamps touched through $touches alone', function () {
+        $invoice = LockedInvoice::query()->create([
+            'number' => 'INV-001',
+            'customer_id' => 7,
+            'issued_at' => now(),
+        ]);
+
+        $this->travel(5)->minutes();
+
+        TouchingLedgerEntry::query()->create(['amount' => 100, 'invoice_id' => $invoice->id]);
+
+        expect(Carbon::parse(DB::table('invoices')->value('updated_at'))->greaterThan($invoice->updated_at))->toBeTrue();
     });
 
     it('leaves soft deleting alone', function () {

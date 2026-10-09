@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Taldres\ImmutableAttributes\Tests\Fixtures\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Taldres\ImmutableAttributes\Attributes\Immutable;
+use Taldres\ImmutableAttributes\Attributes\ImmutableModel;
 use Taldres\ImmutableAttributes\Concerns\GuardsImmutableAttributes;
 
 /**
@@ -13,7 +13,7 @@ use Taldres\ImmutableAttributes\Concerns\GuardsImmutableAttributes;
  * @property int $amount
  * @property string|null $memo
  */
-#[Immutable]
+#[ImmutableModel]
 class LedgerEntry extends Model
 {
     use GuardsImmutableAttributes;

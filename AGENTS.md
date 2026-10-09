@@ -13,7 +13,7 @@ This repository is a Laravel package. Keep the package focused, idiomatic, and e
 ## Project Rules
 
 - Code, comments, commit messages and docs are in English. Comments only explain a non-obvious why.
-- The package is a trait, an attribute and an exception. It has no service provider, config, migrations or routes; keep it that way unless a feature cannot work without one.
+- The package is a trait, two attributes and two exceptions. It has no service provider, config, migrations or routes; keep it that way unless a feature cannot work without one.
 - The guard covers the model's save path only. Query builder writes stay unguarded on purpose, as the escape hatch for deliberate corrections.
 - Every write path the README lists as guarded or not guarded has a test that pins it.
 - Write the implementation from Laravel's own APIs. Do not copy code from other immutability packages or from closed framework pull requests.

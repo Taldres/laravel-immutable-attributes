@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Taldres\ImmutableAttributes\Attributes\Immutable;
+use Taldres\ImmutableAttributes\Attributes\ImmutableModel;
+use Taldres\ImmutableAttributes\Exceptions\InvalidImmutableColumnsException;
 
 it('takes columns as arguments', function () {
     expect((new Immutable('number', 'customer_id'))->columns)->toBe(['number', 'customer_id']);
@@ -16,14 +18,20 @@ it('drops duplicate columns', function () {
     expect((new Immutable('number', ['number', 'total']))->columns)->toBe(['number', 'total']);
 });
 
-it('covers the whole model without arguments', function () {
-    expect((new Immutable)->columns)->toBe(['*']);
-});
+it('needs at least one column', function (Closure $make) {
+    expect($make)->toThrow(InvalidImmutableColumnsException::class, 'needs at least one column. Use #[ImmutableModel] to guard the whole model.');
+})->with([
+    'no arguments' => fn () => new Immutable,
+    'an empty list' => fn () => new Immutable([]),
+]);
 
-it('covers the whole model with a wildcard', function () {
-    expect((new Immutable('*'))->columns)->toBe(['*']);
-});
+it('does not take a wildcard', function (Closure $make) {
+    expect($make)->toThrow(InvalidImmutableColumnsException::class, 'does not take "*". Use #[ImmutableModel] to guard the whole model.');
+})->with([
+    'alone' => fn () => new Immutable('*'),
+    'next to columns' => fn () => new Immutable('number', ['*']),
+]);
 
-it('covers nothing with an empty list', function () {
-    expect((new Immutable([]))->columns)->toBe([]);
+it('covers the whole model as #[ImmutableModel]', function () {
+    expect((new ImmutableModel)->columns)->toBe(['*']);
 });

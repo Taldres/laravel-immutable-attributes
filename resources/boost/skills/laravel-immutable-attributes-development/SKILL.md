@@ -2,7 +2,8 @@
 name: laravel-immutable-attributes-development
 description: >
   Protect Eloquent columns that must not change after insert with
-  taldres/laravel-immutable-attributes: declare them with #[Immutable], handle
+  taldres/laravel-immutable-attributes: declare them with #[Immutable] or
+  #[ImmutableModel], handle
   ImmutableAttributeException, and make deliberate corrections through the
   query builder.
 license: MIT
@@ -43,10 +44,14 @@ class Invoice extends Model
 }
 ```
 
-- `#[Immutable]` without arguments, or `#[Immutable('*')]`, guards every
-  attribute of an existing row; an empty list, `#[Immutable([])]`, guards nothing
-- both the attribute and the trait are required; the attribute alone does nothing
-- `#[Immutable]` on a parent model or on a trait the model uses is merged in
+- `#[ImmutableModel]` guards every attribute: the row is never updated again,
+  not even by `touch()` or `restore()`; deleting stays possible
+- `#[Immutable]` needs at least one column and rejects `'*'`; a model declared
+  that way fails when it boots with `InvalidImmutableColumnsException`, so use
+  `#[ImmutableModel]` for the whole model
+- the trait is required; an attribute alone does nothing
+- `#[Immutable]` and `#[ImmutableModel]` on a parent model or on a trait the
+  model uses are merged in
 - override `public function getImmutableAttributes(): array` only when the list
   depends on runtime state; decide on the stored state with `getOriginal()`, not
   on unsaved attributes, and return `['*']` for the whole model
@@ -68,7 +73,7 @@ class Invoice extends Model
 ## Examples
 
 - an order whose `user_id` and `placed_at` must never move to another customer or day
-- an activity log where rows are only ever inserted: `#[Immutable]`
+- an activity log where rows are only ever inserted: `#[ImmutableModel]`
 
 ## Anti-patterns
 

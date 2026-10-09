@@ -63,44 +63,53 @@ class Invoice extends Model
 }
 ```
 
-`#[Immutable(['number', 'customer_id'])]` works as well; an empty list guards
-nothing. Without arguments, or with `'*'` as in `$guarded = ['*']`, the whole
-model is immutable once it exists, which suits append-only tables such as logs
-or ledgers:
+`#[Immutable(['number', 'customer_id'])]` works as well. It needs at least one
+column and does not take `'*'`; a model declared that way fails when it boots
+with an `InvalidImmutableColumnsException` that names the class carrying the
+attribute.
+
+### The whole model
+
+`#[ImmutableModel]` guards every attribute: once a row exists it is never
+updated again, not even by `touch()` or `restore()`. Deleting stays possible.
+That suits tables whose rows are only ever added, such as logs or ledgers:
 
 ```php
-#[Immutable]
+use Taldres\ImmutableAttributes\Attributes\ImmutableModel;
+
+#[ImmutableModel]
 class LedgerEntry extends Model
 {
     use GuardsImmutableAttributes;
 }
 ```
 
-Columns stack: `#[Immutable]` on a parent model, on the model itself, and on any
-trait they use are merged, so a child model can add attributes but never release
-one.
+### Inheritance and presets
 
-`Immutable` can be extended for a named preset. The subclass needs its own
+Declarations stack: `#[Immutable]` and `#[ImmutableModel]` on a parent model, on
+the model itself, and on any trait they use are merged, so a child model can add
+attributes but never release one.
+
+Both attributes can be extended for a named preset. The subclass needs its own
 `#[Attribute]` marker:
 
 ```php
 use Attribute;
-use Taldres\ImmutableAttributes\Attributes\Immutable;
+use Taldres\ImmutableAttributes\Attributes\ImmutableModel;
 
 #[Attribute(Attribute::TARGET_CLASS)]
-class AppendOnly extends Immutable
+class Ledger extends ImmutableModel
 {
-    public function __construct()
-    {
-        parent::__construct('*');
-    }
+    //
 }
 ```
 
-To decide at runtime, override `getImmutableAttributes()`. Base the decision on
-the stored state with `getOriginal()`, not on unsaved attributes; otherwise the
-save that finalizes the row is already checked against the stricter list and
-throws:
+### Deciding at runtime
+
+Override `getImmutableAttributes()` and return the guarded attributes, or `['*']`
+for all of them, as Laravel's `getGuarded()` does. Base the decision on the
+stored state with `getOriginal()`, not on unsaved attributes; otherwise the save
+that finalizes the row is already checked against the stricter list and throws:
 
 ```php
 public function getImmutableAttributes(): array
@@ -138,8 +147,8 @@ another column.
 | Changes made by `updating` listeners and observers | `incrementEachQuietly()` and `decrementEachQuietly()` |
 | `increment()` and `decrement()`, including their extra columns | Deleting and soft deleting |
 | `incrementEach()` and `decrementEach()` on Laravel 13.3 and later | Parent timestamps touched through `$touches` |
-| `touch()` when the touched column is immutable, such as `updated_at` on a whole-model `#[Immutable]` | |
-| `restore()` when `deleted_at` is immutable, such as on a whole-model `#[Immutable]` | |
+| `touch()` when the touched column is immutable, such as `updated_at` under `#[ImmutableModel]` | |
+| `restore()` when `deleted_at` is immutable, such as under `#[ImmutableModel]` | |
 
 The query builder stays open on purpose: it is the escape hatch for deliberate
 corrections, data migrations and erasure.
