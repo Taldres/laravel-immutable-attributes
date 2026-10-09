@@ -84,6 +84,9 @@ one.
 `#[Attribute]` marker:
 
 ```php
+use Attribute;
+use Taldres\ImmutableAttributes\Attributes\Immutable;
+
 #[Attribute(Attribute::TARGET_CLASS)]
 class AppendOnly extends Immutable
 {
@@ -94,12 +97,15 @@ class AppendOnly extends Immutable
 }
 ```
 
-To decide at runtime, override `getImmutableAttributes()`:
+To decide at runtime, override `getImmutableAttributes()`. Base the decision on
+the stored state with `getOriginal()`, not on unsaved attributes; otherwise the
+save that finalizes the row is already checked against the stricter list and
+throws:
 
 ```php
 public function getImmutableAttributes(): array
 {
-    return $this->isFinalized() ? ['*'] : ['number'];
+    return $this->getOriginal('finalized_at') !== null ? ['*'] : ['number'];
 }
 ```
 
@@ -119,6 +125,8 @@ try {
 ```
 
 The model keeps its unsaved changes; call `$invoice->refresh()` to discard them.
+Until then every save of that model throws, including an `increment()` of
+another column.
 
 ### What is guarded
 
@@ -126,16 +134,38 @@ The model keeps its unsaved changes; call `$invoice->refresh()` to discard them.
 | --- | --- |
 | `save()`, `update()`, `push()` | Query builder writes: `Invoice::whereKey($id)->update([...])`, `upsert()`, raw queries |
 | `fill()` and `forceFill()` followed by a save | `incrementQuietly()` and `decrementQuietly()`, which fire no events and write their own query |
-| `saveQuietly()`, `updateQuietly()`, `Model::withoutEvents()` | Deleting and soft deleting |
-| Changes made by `updating` listeners and observers | |
-| `increment()` and `decrement()`, including their extra columns | |
-| `touch('column')` on an immutable column | |
+| `saveQuietly()`, `updateQuietly()` and saves inside `Model::withoutEvents()` | `increment()` and `decrement()` inside `Model::withoutEvents()`, for the same reason |
+| Changes made by `updating` listeners and observers | `incrementEachQuietly()` and `decrementEachQuietly()` |
+| `increment()` and `decrement()`, including their extra columns | Deleting and soft deleting |
+| `incrementEach()` and `decrementEach()` on Laravel 13.3 and later | Parent timestamps touched through `$touches` |
+| `touch()` when the touched column is immutable, such as `updated_at` on a whole-model `#[Immutable]` | |
+| `restore()` when `deleted_at` is immutable, such as on a whole-model `#[Immutable]` | |
 
 The query builder stays open on purpose: it is the escape hatch for deliberate
 corrections, data migrations and erasure.
 
-A model that overrides `getDirtyForUpdate()` itself replaces the package's
-check for saves without events.
+An attribute that was not selected, as with `select('id', 'paid')`, counts as
+changed once you set it, even to the stored value.
+
+The check for saves without events lives in `getDirtyForUpdate()`. If the model
+overrides that method, PHP uses the model's method instead of the trait's, and
+`parent::getDirtyForUpdate()` skips the trait, so the check is gone. Alias the
+trait method and call it instead:
+
+```php
+use GuardsImmutableAttributes {
+    getDirtyForUpdate as protected guardedDirtyForUpdate;
+}
+
+protected function getDirtyForUpdate(): array
+{
+    $dirty = $this->guardedDirtyForUpdate();
+
+    // Your own adjustments.
+
+    return $dirty;
+}
+```
 
 ## AI agents
 

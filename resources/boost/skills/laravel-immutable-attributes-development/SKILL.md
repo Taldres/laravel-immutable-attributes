@@ -48,14 +48,16 @@ class Invoice extends Model
 - both the attribute and the trait are required; the attribute alone does nothing
 - `#[Immutable]` on a parent model or on a trait the model uses is merged in
 - override `public function getImmutableAttributes(): array` only when the list
-  depends on runtime state; return `['*']` for the whole model
+  depends on runtime state; decide on the stored state with `getOriginal()`, not
+  on unsaved attributes, and return `['*']` for the whole model
 
 ### 3. Handle violations
 
 - a change throws `Taldres\ImmutableAttributes\Exceptions\ImmutableAttributeException`
   (a `RuntimeException`) before the update query runs, with `model`, `key` and
   `attributes` properties
-- the model keeps its unsaved changes; `refresh()` discards them
+- the model keeps its unsaved changes; `refresh()` discards them, and until then
+  every save of that model throws, including an `increment()` of another column
 
 ### 4. Deliberate corrections
 
@@ -73,4 +75,5 @@ class Invoice extends Model
 - do not add an `updating` listener that re-implements the check
 - do not catch `ImmutableAttributeException` to retry the same save
 - do not route normal application writes through the query builder to get around the guard
-- do not rely on the guard for `incrementQuietly()`, `decrementQuietly()`, mass updates or deletes; it does not cover them
+- do not rely on the guard for `incrementQuietly()`, `decrementQuietly()`, increments inside `Model::withoutEvents()`, mass updates, `$touches` or deletes; it does not cover them
+- do not override `getDirtyForUpdate()` on a guarded model without aliasing the trait method and calling it; `parent::getDirtyForUpdate()` skips the guard
