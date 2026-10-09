@@ -26,6 +26,7 @@ return new class extends Migration
             $table->id();
             $table->integer('amount');
             $table->string('memo')->nullable();
+            $table->softDeletes();
         });
     }
 

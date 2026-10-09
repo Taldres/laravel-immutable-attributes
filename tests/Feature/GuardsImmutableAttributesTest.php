@@ -5,12 +5,17 @@ declare(strict_types=1);
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Taldres\ImmutableAttributes\Attributes\Immutable;
+use Taldres\ImmutableAttributes\Concerns\GuardsImmutableAttributes;
 use Taldres\ImmutableAttributes\Exceptions\ImmutableAttributeException;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\AuditEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\ConfiguredInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\CreditNote;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\DraftLedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\Invoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\LedgerEntry;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\ReopenedInvoice;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\SoftDeletingLedgerEntry;
 
 /**
  * @param  array<string, mixed>  $attributes
@@ -91,9 +96,11 @@ describe('updating', function () {
 
         $invoice->issued_at = '2026-10-01 09:00:00';
         $invoice->customer_id = '7';
-        $invoice->save();
+        $invoice->paid = true;
 
-        expect($invoice->wasChanged())->toBeFalse();
+        expect($invoice->save())->toBeTrue()
+            ->and($invoice->wasChanged('paid'))->toBeTrue()
+            ->and($invoice->wasChanged(['issued_at', 'customer_id']))->toBeFalse();
     });
 
     it('throws on changes to cast values', function () {
@@ -144,6 +151,21 @@ describe('updating', function () {
 
         expect(fn () => $invoice->update(['paid' => true]))->toThrow(ImmutableAttributeException::class);
         expect(storedNumber($invoice))->toBe('INV-001');
+    });
+
+    it('keeps the unsaved changes after a violation', function () {
+        $invoice = invoice();
+
+        $invoice->number = 'INV-999';
+
+        expect(fn () => $invoice->save())->toThrow(ImmutableAttributeException::class);
+        expect($invoice->isDirty('number'))->toBeTrue();
+        expect(fn () => $invoice->save())->toThrow(ImmutableAttributeException::class);
+
+        $invoice->refresh();
+
+        expect($invoice->number)->toBe('INV-001')
+            ->and($invoice->save())->toBeTrue();
     });
 
     it('names every changed immutable attribute', function () {
@@ -218,7 +240,7 @@ describe('resolving the attributes', function () {
             ->toEqualCanonicalizing(['total', 'note', 'number', 'customer_id', 'issued_at', 'options']);
     });
 
-    it('guards the merged attributes', function () {
+    it('guards the merged attributes', function (string $column, mixed $value) {
         $note = CreditNote::query()->create([
             'number' => 'CN-001',
             'customer_id' => 7,
@@ -227,16 +249,74 @@ describe('resolving the attributes', function () {
             'note' => 'Refund',
         ]);
 
-        expect(fn () => $note->update(['note' => 'Changed']))->toThrow(ImmutableAttributeException::class);
-        expect(fn () => $note->update(['total' => -400]))->toThrow(ImmutableAttributeException::class);
-        expect(fn () => $note->update(['number' => 'CN-002']))->toThrow(ImmutableAttributeException::class);
+        expect(fn () => $note->update([$column => $value]))
+            ->toThrow(function (ImmutableAttributeException $e) use ($column): void {
+                expect($e->attributes)->toBe([$column]);
+            });
+    })->with([
+        'from the model' => ['total', -400],
+        'from a trait used by a trait' => ['note', 'Changed'],
+        'from the parent' => ['number', 'CN-002'],
+    ]);
+
+    it('inherits the whole chain without an attribute of its own', function () {
+        expect((new class extends CreditNote {})->getImmutableAttributes())
+            ->toEqualCanonicalizing(['total', 'note', 'number', 'customer_id', 'issued_at', 'options']);
     });
+
+    it('merges repeated #[Immutable] on one class', function () {
+        $model = new #[Immutable('number')] #[Immutable(['customer_id', 'issued_at'])] class extends Model
+        {
+            use GuardsImmutableAttributes;
+        };
+
+        expect($model->getImmutableAttributes())->toBe(['number', 'customer_id', 'issued_at']);
+    });
+
+    it('guards nothing without any #[Immutable]', function () {
+        $model = new class extends Model
+        {
+            use GuardsImmutableAttributes;
+        };
+
+        expect($model->getImmutableAttributes())->toBe([]);
+    });
+
+    it('guards everything when a wildcard sits next to columns', function (Model $model) {
+        expect($model->isImmutableAttribute('amount'))->toBeTrue();
+    })->with([
+        'a child adds a column to a wildcard parent' => fn () => new #[Immutable('memo')] class extends LedgerEntry {},
+        'a column next to the wildcard' => fn () => new #[Immutable('memo', '*')] class extends Model
+        {
+            use GuardsImmutableAttributes;
+        },
+    ]);
 
     it('reads attributes that extend #[Immutable]', function () {
         $entry = AuditEntry::query()->create(['amount' => 100]);
 
         expect($entry->getImmutableAttributes())->toBe(['*']);
         expect(fn () => $entry->update(['memo' => 'correction']))->toThrow(ImmutableAttributeException::class);
+    });
+
+    it('guards nothing with an empty list', function () {
+        $entry = DraftLedgerEntry::query()->create(['amount' => 100]);
+
+        $entry->update(['amount' => 120, 'memo' => 'corrected']);
+
+        expect($entry->getImmutableAttributes())->toBe([])
+            ->and($entry->fresh()?->amount)->toBe(120);
+    });
+
+    it('keeps the parent attributes when a child declares an empty list', function () {
+        $invoice = ReopenedInvoice::query()->create([
+            'number' => 'INV-001',
+            'customer_id' => 7,
+            'issued_at' => now(),
+        ]);
+
+        expect($invoice->getImmutableAttributes())->toBe(['number', 'customer_id', 'issued_at', 'options']);
+        expect(fn () => $invoice->update(['number' => 'INV-999']))->toThrow(ImmutableAttributeException::class);
     });
 
     it('tells whether an attribute is immutable', function () {
@@ -260,6 +340,25 @@ describe('resolving the attributes', function () {
         $invoice->update(['number' => 'INV-002']);
 
         expect(fn () => $invoice->update(['note' => 'Changed']))->toThrow(ImmutableAttributeException::class);
+
+        ConfiguredInvoice::$frozen = ['number'];
+        $invoice->refresh();
+
+        expect(fn () => $invoice->update(['number' => 'INV-003']))->toThrow(ImmutableAttributeException::class)
+            ->and($invoice->refresh()->update(['note' => 'Changed']))->toBeTrue();
+    });
+
+    it('lets a model guard everything at runtime', function () {
+        ConfiguredInvoice::$frozen = ['*'];
+
+        $invoice = ConfiguredInvoice::query()->create([
+            'number' => 'INV-001',
+            'customer_id' => 7,
+            'issued_at' => now(),
+        ]);
+
+        expect($invoice->isImmutableAttribute('anything'))->toBeTrue();
+        expect(fn () => $invoice->update(['note' => 'Changed']))->toThrow(ImmutableAttributeException::class);
     });
 });
 
@@ -272,12 +371,38 @@ describe('outside the model', function () {
         expect(storedNumber($invoice))->toBe('INV-999');
     });
 
-    it('leaves incrementQuietly() alone, which fires no events', function () {
+    it('leaves upsert() alone', function () {
+        $invoice = invoice();
+
+        Invoice::query()->upsert([[
+            'id' => $invoice->id,
+            'number' => 'INV-999',
+            'customer_id' => 7,
+            'issued_at' => '2026-10-01 09:00:00',
+        ]], ['id'], ['number']);
+
+        expect(storedNumber($invoice))->toBe('INV-999');
+    });
+
+    it('leaves incrementQuietly() and decrementQuietly() alone, which fire no events', function () {
         $invoice = invoice();
 
         $invoice->incrementQuietly('customer_id');
+        $invoice->decrementQuietly('customer_id', 2);
 
-        expect(DB::table('invoices')->value('customer_id'))->toBe(8);
+        expect(DB::table('invoices')->value('customer_id'))->toBe(6);
+    });
+
+    it('leaves soft deleting alone', function () {
+        $entry = SoftDeletingLedgerEntry::query()->create(['amount' => 100]);
+
+        $entry->delete();
+
+        expect($entry->trashed())->toBeTrue();
+
+        $entry->forceDelete();
+
+        expect(DB::table('ledger_entries')->count())->toBe(0);
     });
 
     it('leaves deleting alone', function () {
