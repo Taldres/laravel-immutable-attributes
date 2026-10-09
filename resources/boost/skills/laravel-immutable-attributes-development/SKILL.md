@@ -43,8 +43,8 @@ class Invoice extends Model
 }
 ```
 
-- `#[Immutable]` without arguments guards every attribute of an existing row;
-  an empty list, `#[Immutable([])]`, guards nothing
+- `#[Immutable]` without arguments, or `#[Immutable('*')]`, guards every
+  attribute of an existing row; an empty list, `#[Immutable([])]`, guards nothing
 - both the attribute and the trait are required; the attribute alone does nothing
 - `#[Immutable]` on a parent model or on a trait the model uses is merged in
 - override `public function getImmutableAttributes(): array` only when the list

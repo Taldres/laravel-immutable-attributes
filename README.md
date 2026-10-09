@@ -64,8 +64,9 @@ class Invoice extends Model
 ```
 
 `#[Immutable(['number', 'customer_id'])]` works as well; an empty list guards
-nothing. Without arguments the whole model is immutable once it exists, which
-suits append-only tables such as logs or ledgers:
+nothing. Without arguments, or with `'*'` as in `$guarded = ['*']`, the whole
+model is immutable once it exists, which suits append-only tables such as logs
+or ledgers:
 
 ```php
 #[Immutable]

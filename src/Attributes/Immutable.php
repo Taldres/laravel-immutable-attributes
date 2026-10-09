@@ -9,8 +9,8 @@ use Attribute;
 /**
  * Marks model attributes that may be set on insert but never change afterwards.
  *
- * Without arguments the whole model is immutable once it exists; an empty list
- * guards nothing.
+ * Without arguments or with "*" the whole model is immutable once it exists;
+ * an empty list guards nothing.
  */
 #[Attribute(Attribute::TARGET_CLASS | Attribute::IS_REPEATABLE)]
 class Immutable

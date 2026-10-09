@@ -20,6 +20,10 @@ it('covers the whole model without arguments', function () {
     expect((new Immutable)->columns)->toBe(['*']);
 });
 
+it('covers the whole model with a wildcard', function () {
+    expect((new Immutable('*'))->columns)->toBe(['*']);
+});
+
 it('covers nothing with an empty list', function () {
     expect((new Immutable([]))->columns)->toBe([]);
 });
