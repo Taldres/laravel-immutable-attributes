@@ -1,0 +1,7 @@
+parameters:
+    level: 10
+    paths:
+        - src
+        # PHPStan checks a trait only through the classes that use it.
+        - tests/Fixtures
+    tmpDir: build/phpstan
