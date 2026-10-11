@@ -4,6 +4,7 @@
 
 > **Columns that are set once and never change: declare them on the Eloquent model, and every save that would alter them throws.**
 
+[![Packagist Downloads](https://img.shields.io/packagist/dt/taldres/laravel-immutable-attributes)](https://packagist.org/packages/taldres/laravel-immutable-attributes)
 ![Tests](https://img.shields.io/github/actions/workflow/status/taldres/laravel-immutable-attributes/tests.yml?label=tests)
 ![PHPStan](https://img.shields.io/badge/PHPStan-level%2010-brightgreen)
 ![Laravel](https://img.shields.io/badge/Laravel-12%20%7C%2013-red)
