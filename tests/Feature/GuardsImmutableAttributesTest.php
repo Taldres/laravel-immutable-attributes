@@ -20,6 +20,7 @@ use Taldres\ImmutableAttributes\Tests\Fixtures\Models\ConfiguredInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\CountedInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\CreditNote;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\Invoice;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\JsonCountedInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\LedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\LockedInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\MisdeclaredExceptInvoice;
@@ -32,9 +33,11 @@ use Taldres\ImmutableAttributes\Tests\Fixtures\Models\PinnedCountedInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\PostgresInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\PresetLedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\RestampedInvoice;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\RestorableLedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\SoftDeletingLedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\TotalOnlyInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\TouchingLedgerEntry;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\TraitCountedInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\UnusableInvoice;
 
 /**
@@ -609,6 +612,59 @@ describe('leaving columns out of the whole model', function () {
         $this->travel(5)->minutes();
 
         expect($invoice->touch())->toBeTrue();
+    });
+
+    // @todo Laravel 13.3: Drop the skip once composer.json requires ^13.3.
+    it('counts up several columns it leaves out with incrementEach()', function () {
+        $invoice = countedInvoice();
+
+        $invoice->incrementEach(['total' => 5, 'customer_id' => 0], ['note' => 'Checked']);
+
+        expect(DB::table('invoices')->value('total'))->toBe(1005)
+            ->and(DB::table('invoices')->value('note'))->toBe('Checked');
+        expect(fn () => $invoice->incrementEach(['total' => 1, 'customer_id' => 1]))
+            ->toThrow(fn (ImmutableAttributeException $e) => expect($e->attributes)->toBe(['customer_id']));
+    })->skip(! method_exists(Model::class, 'incrementEach'), 'Model::incrementEach() arrived in Laravel 13.3.');
+
+    it('guards a save without events the same way', function () {
+        $invoice = countedInvoice();
+
+        $invoice->total = 2000;
+        $invoice->note = 'Checked';
+
+        expect($invoice->saveQuietly())->toBeTrue();
+
+        $invoice->number = 'INV-999';
+
+        expect(fn () => $invoice->saveQuietly())
+            ->toThrow(fn (ImmutableAttributeException $e) => expect($e->attributes)->toBe(['number']));
+    });
+
+    it('restores a deleted row only when deleted_at is left out', function () {
+        $entry = RestorableLedgerEntry::query()->create(['amount' => 100]);
+
+        $entry->delete();
+
+        expect($entry->restore())->toBeTrue();
+        expect(DB::table('ledger_entries')->value('deleted_at'))->toBeNull();
+        expect(fn () => $entry->update(['amount' => 200]))->toThrow(ImmutableAttributeException::class, '[amount]');
+    });
+
+    it('writes a JSON path into a column it leaves out', function () {
+        $invoice = countedInvoice(JsonCountedInvoice::class);
+
+        expect((new JsonCountedInvoice)->isImmutableAttribute('options->currency'))->toBeFalse();
+        expect($invoice->update(['options->currency' => 'USD']))->toBeTrue();
+        expect(json_decode((string) DB::table('invoices')->value('options'), true))->toBe(['currency' => 'USD']);
+    });
+
+    it('leaves out only what a trait and the model both leave out', function () {
+        expect((new TraitCountedInvoice)->getMutableAttributes())->toEqualCanonicalizing(['note', 'updated_at']);
+
+        $invoice = countedInvoice(TraitCountedInvoice::class);
+
+        expect(fn () => $invoice->update(['total' => 2000]))->toThrow(ImmutableAttributeException::class, '[total]');
+        expect($invoice->refresh()->update(['note' => 'Checked']))->toBeTrue();
     });
 
     it('lists what it leaves out', function () {
