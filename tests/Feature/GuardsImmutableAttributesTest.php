@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Taldres\ImmutableAttributes\Attributes\Immutable;
@@ -39,6 +40,11 @@ function invoice(array $attributes = []): Invoice
         'options' => ['currency' => 'EUR'],
         ...$attributes,
     ]);
+}
+
+function onPostgres(): bool
+{
+    return DB::connection()->getDriverName() === 'pgsql';
 }
 
 function storedNumber(Model $model): mixed
@@ -221,16 +227,31 @@ describe('column name aliases', function () {
 
         expect(fn () => $change($invoice))->toThrow(ImmutableAttributeException::class);
         expect(storedNumber($invoice))->toBe('INV-001')
-            ->and(DB::table('invoices')->value('options'))->toBe('{"currency":"EUR"}');
+            ->and(json_decode((string) DB::table('invoices')->value('options'), true))->toBe(['currency' => 'EUR']);
     })->with([
-        'upper case on save' => fn (Invoice $invoice) => $invoice->forceFill(['NUMBER' => 'INV-999'])->save(),
         'table prefix on save' => fn (Invoice $invoice) => $invoice->forceFill(['invoices.number' => 'INV-999'])->save(),
         'any qualifier on save' => fn (Invoice $invoice) => $invoice->forceFill(['anything.number' => 'INV-999'])->save(),
-        'upper case in increment extras' => fn (Invoice $invoice) => $invoice->increment('total', 1, ['NUMBER' => 'INV-999']),
         'JSON path in increment extras' => fn (Invoice $invoice) => $invoice->increment('total', 1, ['options->currency' => 'USD']),
         'table prefix in increment extras' => fn (Invoice $invoice) => $invoice->increment('total', 1, ['invoices.number' => 'INV-999']),
         'any qualifier in increment extras' => fn (Invoice $invoice) => $invoice->increment('total', 1, ['anything.number' => 'INV-999']),
     ]);
+
+    it('treats case as the same column outside PostgreSQL', function (Closure $change) {
+        $invoice = invoice();
+
+        expect(fn () => $change($invoice))->toThrow(ImmutableAttributeException::class);
+        expect(storedNumber($invoice))->toBe('INV-001');
+    })->with([
+        'upper case on save' => fn (Invoice $invoice) => $invoice->forceFill(['NUMBER' => 'INV-999'])->save(),
+        'upper case in increment extras' => fn (Invoice $invoice) => $invoice->increment('total', 1, ['NUMBER' => 'INV-999']),
+    ])->skip(fn () => onPostgres(), 'PostgreSQL tells "NUMBER" and "number" apart.');
+
+    it('leaves a column that differs in case to PostgreSQL, which has no such column', function () {
+        $invoice = invoice();
+
+        expect(fn () => $invoice->forceFill(['NUMBER' => 'INV-999'])->save())->toThrow(QueryException::class);
+        expect(storedNumber($invoice))->toBe('INV-001');
+    })->skip(fn () => ! onPostgres(), 'Only PostgreSQL tells "NUMBER" and "number" apart.');
 
     it('names each declared attribute once', function (Closure $change, array $attributes) {
         $invoice = invoice();
@@ -238,14 +259,14 @@ describe('column name aliases', function () {
         expect(fn () => $change($invoice))
             ->toThrow(fn (ImmutableAttributeException $e) => expect($e->attributes)->toBe($attributes));
     })->with([
-        'upper case' => [fn (Invoice $invoice) => $invoice->forceFill(['NUMBER' => 'INV-999'])->save(), ['number']],
+        'a table prefix' => [fn (Invoice $invoice) => $invoice->forceFill(['invoices.number' => 'INV-999'])->save(), ['number']],
         'a JSON path and its column' => [fn (Invoice $invoice) => $invoice->increment('total', 1, ['options->currency' => 'USD']), ['options']],
     ]);
 
     it('reports the column a key writes as immutable', function () {
         $invoice = new Invoice;
 
-        expect($invoice->isImmutableAttribute('NUMBER'))->toBeTrue()
+        expect($invoice->isImmutableAttribute('NUMBER'))->toBe(! onPostgres())
             ->and($invoice->isImmutableAttribute('public.invoices.number'))->toBeTrue()
             ->and($invoice->isImmutableAttribute('options->currency'))->toBeTrue()
             ->and($invoice->isImmutableAttribute('invoices.total'))->toBeFalse();
@@ -340,7 +361,7 @@ describe('incrementing', function () {
         $invoice = NormalizedInvoice::query()->create(['number' => 'INV-001', 'customer_id' => 7, 'issued_at' => now(), 'paid' => true]);
 
         expect(fn () => $invoice->increment('paid'))->toThrow(ImmutableAttributeException::class);
-        expect(DB::table('invoices')->value('paid'))->toBe(1);
+        expect((bool) DB::table('invoices')->value('paid'))->toBeTrue();
     });
 
     it('takes a numeric string as the amount, as Laravel does', function () {
@@ -409,7 +430,9 @@ describe('incrementing', function () {
     it('leaves an increment by zero without timestamps alone', function () {
         $invoice = LockedInvoice::query()->create(['number' => 'INV-001', 'customer_id' => 7, 'issued_at' => now(), 'total' => 1000]);
 
-        expect(LockedInvoice::withoutTimestamps(fn () => $invoice->increment('total', 0)))->toBe(1);
+        expect(fn () => LockedInvoice::withoutTimestamps(fn () => $invoice->increment('total', 0)))
+            ->not->toThrow(ImmutableAttributeException::class);
+        expect(DB::table('invoices')->value('total'))->toBe(1000);
     });
 
     it('forgets the columns of an increment that threw', function () {

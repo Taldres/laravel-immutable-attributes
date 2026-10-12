@@ -47,3 +47,11 @@ Run everything CI runs, static analysis, lint, type coverage and Pest:
 ```bash
 composer test
 ```
+
+The suite runs on SQLite. The `databases` workflow runs it on MySQL, MariaDB and
+PostgreSQL as well, because the drivers read column names differently. To try
+one locally, start a server and point Laravel at it:
+
+```bash
+DB_CONNECTION=pgsql DB_HOST=127.0.0.1 DB_PORT=5432 DB_DATABASE=laravel DB_USERNAME=forge DB_PASSWORD=password vendor/bin/pest
+```
