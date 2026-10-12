@@ -5,19 +5,3 @@ parameters:
         # PHPStan checks a trait only through the classes that use it.
         - tests/Fixtures
     tmpDir: build/phpstan
-    ignoreErrors:
-        # Model::incrementOrDecrementEach() arrived in Laravel 13.3; the
-        # override is never called on earlier versions, and the ignores only
-        # match there.
-        # @todo Laravel 13.3: Once composer.json requires ^13.3, remove both
-        # entries.
-        -
-            identifier: staticMethod.notFound
-            message: '#Model::incrementOrDecrementEach\(\)#'
-            path: src/Concerns/GuardsImmutableAttributes.php
-            reportUnmatched: false
-        -
-            identifier: return.type
-            message: '#incrementOrDecrementEach\(\) should return int\|false#'
-            path: src/Concerns/GuardsImmutableAttributes.php
-            reportUnmatched: false

@@ -23,7 +23,6 @@
         "illuminate/support": "^12.0||^13.0"
     },
     "require-dev": {
-        "brianium/paratest": "!=7.26.1",
         "larastan/larastan": "^3.13",
         "laravel/pao": "^1.0",
         "laravel/pint": "^1.29",
@@ -31,8 +30,7 @@
         "pestphp/pest": "^4.6||^5.0",
         "pestphp/pest-plugin-laravel": "^4.1||^5.0",
         "pestphp/pest-plugin-type-coverage": "^4.0||^5.0",
-        "phpstan/extension-installer": "^1.4",
-        "tomasvotruba/type-coverage": "^2.3"
+        "phpstan/extension-installer": "^1.4"
     },
     "autoload": {
         "psr-4": {
@@ -76,7 +74,7 @@
             "@php -d memory_limit=1G vendor/bin/pest --type-coverage --min=100"
         ],
         "test:unit": [
-            "vendor/bin/pest --parallel"
+            "vendor/bin/pest"
         ],
         "test": [
             "@analyse",

@@ -83,8 +83,8 @@ trait GuardsImmutableAttributes
      * called on earlier versions.
      *
      * @todo Laravel 13.3: Once composer.json requires ^13.3, drop the note
-     * above, the ignores in phpstan.neon.dist, the incrementEach() skips in the
-     * tests and the Laravel 13.3 notes in the README and Boost skill.
+     * above, the incrementEach() skips in the tests and the Laravel 13.3 notes
+     * in the README and Boost skill.
      *
      * @param  array<string, float|int>  $columns
      * @param  array<string, mixed>  $extra
