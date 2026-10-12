@@ -16,3 +16,27 @@ updates:
       interval: "weekly"
     labels:
       - "dependencies"
+
+  # Dependabot reads this file from the default branch only, so 1.x is listed
+  # here with target-branch. It stays on the Laravel versions it supports: the
+  # next major version of the framework belongs to main.
+  - package-ecosystem: "github-actions"
+    target-branch: "1.x"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "composer"
+    target-branch: "1.x"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+    ignore:
+      - dependency-name: "illuminate/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "orchestra/testbench"
+        update-types: ["version-update:semver-major"]
