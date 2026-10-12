@@ -28,13 +28,6 @@ trait GuardsImmutableAttributes
      */
     protected static array $resolvedMutableAttributes = [];
 
-    /**
-     * The columns an increment or decrement is about to write to the database.
-     *
-     * @var list<string>
-     */
-    protected array $pendingIncrementColumns = [];
-
     public static function bootGuardsImmutableAttributes(): void
     {
         // Resolve now, so a misconfigured #[Immutable] fails when the model
@@ -42,10 +35,11 @@ trait GuardsImmutableAttributes
         static::$resolvedImmutableAttributes[static::class] ??= static::resolveImmutableAttributes();
         static::$resolvedMutableAttributes[static::class] ??= static::resolveMutableAttributes();
 
-        // Model increment() and decrement() write through their own query and
-        // never reach getDirtyForUpdate(), but they do fire "updating".
+        // Runs before the listeners that were registered later, so a rejected
+        // save does not reach their side effects. getDirtyForUpdate() covers
+        // what this cannot see.
         static::updating(static function (self $model): void {
-            $model->guardImmutableAttributes([...array_keys($model->getDirty()), ...$model->pendingIncrementColumns]);
+            $model->guardImmutableAttributes(array_keys($model->getDirty()));
         });
     }
 
@@ -78,7 +72,10 @@ trait GuardsImmutableAttributes
 
     /**
      * The query receives the raw extra values, while the model holds them after
-     * casts and setters, so the dirty check alone can miss a change.
+     * casts and setters, so the dirty check alone can miss a change. The check
+     * runs here and not on "updating", which the Quietly variants and
+     * Model::withoutEvents() skip. A model that does not exist yet is left
+     * alone: Laravel runs its increment as a query on the whole table.
      *
      * @param  string  $column
      * @param  float|int  $amount
@@ -87,14 +84,14 @@ trait GuardsImmutableAttributes
      */
     protected function incrementOrDecrement($column, $amount, $extra, $method): int|false
     {
-        $outer = $this->pendingIncrementColumns;
-        $this->pendingIncrementColumns = $this->columnsWrittenByIncrement([$column => $amount], $extra);
-
-        try {
-            return parent::incrementOrDecrement($column, $amount, $extra, $method);
-        } finally {
-            $this->pendingIncrementColumns = $outer;
+        if ($this->exists) {
+            $this->guardImmutableAttributes([
+                ...array_keys($this->getDirty()),
+                ...$this->columnsWrittenByIncrement([$column => $amount], $extra),
+            ]);
         }
+
+        return parent::incrementOrDecrement($column, $amount, $extra, $method);
     }
 
     /**
@@ -110,14 +107,14 @@ trait GuardsImmutableAttributes
      */
     protected function incrementOrDecrementEach(array $columns, array $extra, string $method): int|false
     {
-        $outer = $this->pendingIncrementColumns;
-        $this->pendingIncrementColumns = $this->columnsWrittenByIncrement($columns, $extra);
-
-        try {
-            return parent::incrementOrDecrementEach($columns, $extra, $method);
-        } finally {
-            $this->pendingIncrementColumns = $outer;
+        if ($this->exists) {
+            $this->guardImmutableAttributes([
+                ...array_keys($this->getDirty()),
+                ...$this->columnsWrittenByIncrement($columns, $extra),
+            ]);
         }
+
+        return parent::incrementOrDecrementEach($columns, $extra, $method);
     }
 
     /**
