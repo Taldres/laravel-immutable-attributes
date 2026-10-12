@@ -6,6 +6,9 @@ on:
       - main
       - '*.x'
   pull_request:
+  schedule:
+    # Weekly, so a change in Laravel that the guard depends on shows up without a push.
+    - cron: '0 3 * * 1'
 
 permissions:
   contents: read
