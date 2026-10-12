@@ -182,6 +182,8 @@ trait GuardsImmutableAttributes
         $immutable = $this->getImmutableAttributes();
         $differentCase = null;
 
+        array_walk($immutable, $this->assertColumnName(...));
+
         foreach ($immutable as $attribute) {
             $declared = self::columnWrittenBy($attribute);
 
@@ -199,6 +201,19 @@ trait GuardsImmutableAttributes
         }
 
         return in_array('*', $immutable, true) ? $column : null;
+    }
+
+    /**
+     * An override of getImmutableAttributes() is the application's own code, so
+     * what it returns is checked the way a declaration is.
+     *
+     * @throws InvalidImmutableColumnsException
+     */
+    private function assertColumnName(mixed $attribute): void
+    {
+        if (! is_string($attribute) || trim($attribute) === '') {
+            throw InvalidImmutableColumnsException::returnedBy(static::class, $attribute);
+        }
     }
 
     private static function columnWrittenBy(string $key): string

@@ -21,11 +21,14 @@ use Taldres\ImmutableAttributes\Tests\Fixtures\Models\Invoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\LedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\LockedInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\MisdeclaredLedgerEntry;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\MistypedLedgerEntry;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\NarrowedLedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\NormalizedInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\PostgresInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\RestampedInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\SoftDeletingLedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\TouchingLedgerEntry;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\UnusableInvoice;
 
 /**
  * @param  array<string, mixed>  $attributes
@@ -601,6 +604,43 @@ describe('resolving the attributes', function () {
             'Use #[ImmutableModel] to guard the whole model. Declared on ['.HasEmptyImmutableList::class.'].',
         );
     });
+
+    it('rejects a value that is not a column name the same way', function () {
+        expect(fn () => new MistypedLedgerEntry)->toThrow(
+            InvalidImmutableColumnsException::class,
+            'takes column names as non-empty strings, int given. Declared on ['.MistypedLedgerEntry::class.'].',
+        );
+    });
+
+    it('rejects columns on #[ImmutableModel] the same way', function () {
+        expect(fn () => new NarrowedLedgerEntry)->toThrow(
+            InvalidImmutableColumnsException::class,
+            'Use #[Immutable] to guard single columns. Declared on ['.NarrowedLedgerEntry::class.'].',
+        );
+    });
+
+    it('rejects a getImmutableAttributes() override that returns anything but column names', function (array $returned, string $given) {
+        UnusableInvoice::$returned = $returned;
+
+        try {
+            $invoice = new UnusableInvoice;
+            $invoice->setRawAttributes(['id' => 1, 'number' => 'INV-001'], true)->exists = true;
+            $invoice->number = 'INV-999';
+
+            expect(fn () => $invoice->isImmutableAttribute('number'))->toThrow(
+                InvalidImmutableColumnsException::class,
+                UnusableInvoice::class."::getImmutableAttributes() must return column names as non-empty strings, {$given} given.",
+            );
+            expect(fn () => $invoice->save())->toThrow(InvalidImmutableColumnsException::class);
+        } finally {
+            UnusableInvoice::$returned = [];
+        }
+    })->with([
+        'an integer' => [[123], 'int'],
+        'a nested list' => [[['number']], 'array'],
+        'an empty string' => [[''], 'an empty string'],
+        'null next to a column' => [['number', null], 'null'],
+    ]);
 
     it('reads presets that extend #[ImmutableModel]', function () {
         $entry = AuditEntry::query()->create(['amount' => 100]);

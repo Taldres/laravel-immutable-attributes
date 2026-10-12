@@ -86,6 +86,10 @@ class LedgerEntry extends Model
 }
 ```
 
+It takes no columns. Passing one, as in `#[ImmutableModel('number')]`, would
+guard more than meant, so it fails when the model boots with an
+`InvalidImmutableColumnsException`; use `#[Immutable('number')]` instead.
+
 ### Inheritance and presets
 
 Declarations stack: `#[Immutable]` and `#[ImmutableModel]` on a parent model, on
@@ -119,6 +123,10 @@ public function getImmutableAttributes(): array
     return $this->getOriginal('finalized_at') !== null ? ['*'] : ['number'];
 }
 ```
+
+The list must hold column names as non-empty strings. Anything else throws an
+`InvalidImmutableColumnsException` naming the model, the first time the list is
+used.
 
 `getOriginal()` is the state this model instance loaded, not the row as it is now.
 Two limits follow:

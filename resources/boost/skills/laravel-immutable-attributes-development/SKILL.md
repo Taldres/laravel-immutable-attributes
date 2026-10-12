@@ -49,7 +49,8 @@ class Invoice extends Model
   timestamps, which still writes `updated_at`; deleting stays possible
 - `#[Immutable]` needs at least one column and rejects `'*'`; a model declared
   that way fails when it boots with `InvalidImmutableColumnsException`, so use
-  `#[ImmutableModel]` for the whole model
+  `#[ImmutableModel]` for the whole model; `#[ImmutableModel]` takes no columns
+  and fails the same way if given one
 - the trait is required; an attribute alone does nothing
 - `#[Immutable]` and `#[ImmutableModel]` on a parent model or on a trait the
   model uses are merged in
@@ -57,7 +58,9 @@ class Invoice extends Model
   depends on runtime state; decide on the stored state with `getOriginal()`, not
   on unsaved attributes, and return `['*']` for the whole model; the original is
   the state this instance loaded, so select the deciding column and use a
-  transaction with `lockForUpdate()` where another process may finalize the row
+  transaction with `lockForUpdate()` where another process may finalize the row;
+  return column names as non-empty strings, anything else throws
+  `InvalidImmutableColumnsException`
 
 ### 3. Handle violations
 

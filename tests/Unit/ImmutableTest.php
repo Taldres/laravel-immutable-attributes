@@ -39,6 +39,9 @@ it('takes column names as non-empty strings', function (Closure $make, string $g
     'an empty string in a list' => [fn () => new Immutable(['number', '']), 'an empty string'],
     'only whitespace' => [fn () => new Immutable(' '), 'an empty string'],
     'an integer' => [fn () => new Immutable([123]), 'int'],
+    'an integer as an argument' => [fn () => new Immutable(123), 'int'],
+    'null as an argument' => [fn () => new Immutable(null), 'null'],
+    'a boolean next to columns' => [fn () => new Immutable('number', true), 'bool'],
     'a nested list' => [fn () => new Immutable([['number']]), 'array'],
 ]);
 
@@ -48,6 +51,16 @@ it('does not take JSON paths', function () {
         'cannot guard the JSON path "options->currency". Guard the whole column with #[Immutable(\'options\')] instead.',
     );
 });
+
+it('takes no columns as #[ImmutableModel]', function (Closure $make) {
+    expect($make)->toThrow(
+        InvalidImmutableColumnsException::class,
+        '#[ImmutableModel] takes no columns, it guards the whole model. Use #[Immutable] to guard single columns.',
+    );
+})->with([
+    'a column' => fn () => new ImmutableModel('number'),
+    'a list' => fn () => new ImmutableModel(['number']),
+]);
 
 it('covers the whole model as #[ImmutableModel]', function () {
     expect((new ImmutableModel)->columns)->toBe(['*']);

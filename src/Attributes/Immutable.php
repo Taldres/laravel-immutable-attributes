@@ -23,11 +23,14 @@ class Immutable
     public readonly array $columns;
 
     /**
+     * Takes any value so that a wrong one reaches the same exception as every
+     * other misdeclaration, naming the class, instead of a bare TypeError.
+     *
      * @param  array<int, string>|string  ...$columns
      *
      * @throws InvalidImmutableColumnsException
      */
-    public function __construct(array|string ...$columns)
+    public function __construct(mixed ...$columns)
     {
         $this->columns = $this->columnsFrom($columns);
     }
@@ -43,7 +46,7 @@ class Immutable
         $flattened = [];
 
         foreach ($columns as $column) {
-            foreach ((array) $column as $name) {
+            foreach (is_array($column) ? $column : [$column] as $name) {
                 if (! is_string($name) || trim($name) === '') {
                     throw InvalidImmutableColumnsException::invalid($name);
                 }

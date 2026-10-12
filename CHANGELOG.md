@@ -4,7 +4,8 @@
 
 ### Changed
 
-- `#[Immutable]` rejects empty names, non-strings, nested lists and JSON paths such as `options->currency`: a model declared that way now fails when it boots with `InvalidImmutableColumnsException` instead of guarding nothing for them
+- `#[Immutable]` rejects empty names, non-strings, nested lists and JSON paths such as `options->currency`: a model declared that way now fails when it boots with `InvalidImmutableColumnsException` instead of guarding nothing for them. A value of the wrong type, such as `null` or an integer, raises the same exception instead of a `TypeError`
+- `#[ImmutableModel]` rejects columns, which it used to drop silently, and a `getImmutableAttributes()` override that returns anything but column names throws `InvalidImmutableColumnsException`, naming the model, instead of a `TypeError`
 - `increment()`, `decrement()` and, on Laravel 13.3 and later, `incrementEach()` and `decrementEach()` check every column their query writes: the incremented columns, the extra columns and the update timestamp. An immutable extra column throws even with its current value, and under `#[ImmutableModel]` an increment by `0` throws on a model with timestamps, because it still writes `updated_at`
 
 ### Fixed

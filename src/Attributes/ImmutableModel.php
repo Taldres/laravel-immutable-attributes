@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Taldres\ImmutableAttributes\Attributes;
 
 use Attribute;
+use Taldres\ImmutableAttributes\Exceptions\InvalidImmutableColumnsException;
 
 /**
  * Guards every attribute: once the row exists it is never updated again, not
@@ -13,8 +14,19 @@ use Attribute;
 #[Attribute(Attribute::TARGET_CLASS)]
 class ImmutableModel extends Immutable
 {
-    public function __construct()
+    /**
+     * Takes no columns, but accepts any so that one passed by mistake reaches
+     * the exception instead of being dropped, which would guard more than meant.
+     *
+     *
+     * @throws InvalidImmutableColumnsException
+     */
+    public function __construct(mixed ...$columns)
     {
+        if ($columns !== []) {
+            throw InvalidImmutableColumnsException::modelTakesNoColumns();
+        }
+
         parent::__construct();
     }
 
