@@ -1,6 +1,25 @@
 # Release Notes
 
-## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.1.0...HEAD)
+## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.2.0...HEAD)
+
+## [v1.2.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.1.0...v1.2.0) - 2026-10-12
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+### What's Changed
+
+#### Enhancements
+
+* Leave columns out of #[ImmutableModel] with except by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/7
+
+#### Documentation
+
+* Add a pull request skill and document the release steps by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/6
+
+#### Maintenance
+
+* Run the tests and databases workflows weekly by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/8
+
+**Full Changelog**: https://github.com/Taldres/laravel-immutable-attributes/compare/v1.1.0...v1.2.0
 
 ## [v1.1.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.0.0...v1.1.0) - 2026-10-12
 
