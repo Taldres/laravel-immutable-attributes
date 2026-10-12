@@ -1,6 +1,26 @@
 # Release Notes
 
-## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.2.0...HEAD)
+## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.3.0...1.x)
+
+## [v1.3.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.2.0...v1.3.0) - 2026-10-12
+
+<!-- Release notes generated using configuration in .github/release.yml at 1.x -->
+### What's Changed
+
+#### Bug Fixes
+
+* Guard increments and decrements that fire no events by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/10
+
+#### Documentation
+
+* Document increments on a model that does not exist yet by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/9
+* Document releases from a maintenance branch by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/14
+
+#### Maintenance
+
+* Update the changelog of the branch that was released by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/13
+
+**Full Changelog**: https://github.com/Taldres/laravel-immutable-attributes/compare/v1.2.0...v1.3.0
 
 ## [v1.2.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.1.0...v1.2.0) - 2026-10-12
 
