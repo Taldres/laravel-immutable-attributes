@@ -45,6 +45,23 @@ it('takes column names as non-empty strings', function (Closure $make, string $g
     'a nested list' => [fn () => new Immutable([['number']]), 'array'],
 ]);
 
+it('takes column names without whitespace around them', function (Closure $make, string $given) {
+    expect($make)->toThrow(
+        InvalidImmutableColumnsException::class,
+        "takes column names without whitespace around them, {$given} given. Use \"number\" instead.",
+    );
+})->with([
+    'a space in front' => [fn () => new Immutable(' number'), '" number"'],
+    'a space behind' => [fn () => new Immutable('number '), '"number "'],
+    'a tab' => [fn () => new Immutable("\tnumber"), '"\tnumber"'],
+    'a non-breaking space' => [fn () => new Immutable("number\u{00A0}"), '"number\u00a0"'],
+    'in a list' => [fn () => new Immutable(['total', ' number']), '" number"'],
+]);
+
+it('keeps a space inside a column name', function () {
+    expect((new Immutable('num ber'))->columns)->toBe(['num ber']);
+});
+
 it('does not take JSON paths', function () {
     expect(fn () => new Immutable('options->currency'))->toThrow(
         InvalidImmutableColumnsException::class,
@@ -93,6 +110,17 @@ it('takes column names as non-empty strings in except', function (Closure $make,
     'an integer' => [fn () => new ImmutableModel(except: [123]), 'int'],
     'null' => [fn () => new ImmutableModel(except: null), 'null'],
     'a nested list' => [fn () => new ImmutableModel(except: [['total']]), 'array'],
+]);
+
+it('takes column names without whitespace around them in except', function (string $name, string $given) {
+    expect(fn () => new ImmutableModel(except: ['total', $name]))->toThrow(
+        InvalidImmutableColumnsException::class,
+        "#[ImmutableModel] takes column names without whitespace around them in except, {$given} given. Use \"note\" instead.",
+    );
+})->with([
+    'a space in front' => [' note', '" note"'],
+    'a space behind' => ['note ', '"note "'],
+    'a non-breaking space' => ["note\u{00A0}", '"note\u00a0"'],
 ]);
 
 it('cannot leave out the wildcard', function () {
