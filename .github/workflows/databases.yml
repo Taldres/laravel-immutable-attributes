@@ -11,15 +11,20 @@ on:
       - main
       - '*.x'
   pull_request:
-  schedule:
-    # Weekly, so a change in Laravel that the guard depends on shows up without a push.
-    - cron: '0 3 * * 1'
+  # Called by the scheduled workflow on main, because a schedule starts only on
+  # the default branch. The ref names the branch to test.
+  workflow_call:
+    inputs:
+      ref:
+        description: The branch to test; empty for the ref that started the workflow.
+        type: string
+        default: ''
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: databases-${{ inputs.ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -57,6 +62,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Setup PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
@@ -116,6 +123,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Setup PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
@@ -176,6 +185,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Setup PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
