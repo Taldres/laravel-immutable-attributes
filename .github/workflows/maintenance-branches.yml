@@ -1,0 +1,27 @@
+name: maintenance branches
+
+# A schedule starts only on the default branch, so main calls the workflows of
+# each maintained branch itself. They run with the matrix of that branch, and
+# a failure shows up in this run.
+
+on:
+  schedule:
+    # Weekly, an hour after the schedules of the tests and databases workflows.
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests-1x:
+    name: tests 1.x
+    uses: Taldres/laravel-immutable-attributes/.github/workflows/tests.yml@1.x
+    with:
+      ref: 1.x
+
+  databases-1x:
+    name: databases 1.x
+    uses: Taldres/laravel-immutable-attributes/.github/workflows/databases.yml@1.x
+    with:
+      ref: 1.x
