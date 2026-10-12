@@ -33,7 +33,7 @@ class Immutable
     }
 
     /**
-     * @param  array<array-key, array<int, string>|string>  $columns
+     * @param  array<array-key, mixed>  $columns
      * @return list<string>
      *
      * @throws InvalidImmutableColumnsException
@@ -43,7 +43,13 @@ class Immutable
         $flattened = [];
 
         foreach ($columns as $column) {
-            array_push($flattened, ...(array) $column);
+            foreach ((array) $column as $name) {
+                if (! is_string($name) || trim($name) === '') {
+                    throw InvalidImmutableColumnsException::invalid($name);
+                }
+
+                $flattened[] = $name;
+            }
         }
 
         if ($flattened === []) {
@@ -52,6 +58,12 @@ class Immutable
 
         if (in_array('*', $flattened, true)) {
             throw InvalidImmutableColumnsException::wildcard();
+        }
+
+        foreach ($flattened as $name) {
+            if (str_contains($name, '->')) {
+                throw InvalidImmutableColumnsException::jsonPath($name);
+            }
         }
 
         return array_values(array_unique($flattened));
