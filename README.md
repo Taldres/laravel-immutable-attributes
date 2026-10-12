@@ -33,7 +33,7 @@ looks normal, and the damage shows up much later.
 - **One declaration instead of a listener per model.** The usual fix, an `updating` listener that checks `isDirty()`, ends up copied into every model that needs it
 - **Covers the paths a listener misses.** Saves without events (`saveQuietly()`, `withoutEvents()`) and changes made by a later `updating` listener or observer are caught too
 - **Inserts are untouched.** The attributes are set freely until the row exists
-- **Same value is not a change.** The check uses Eloquent's own dirty tracking, casts included
+- **Saving the same value is not a change.** A save is checked with Eloquent's own dirty tracking, casts included. An increment is checked by the columns its query writes, because that query bypasses casts
 
 ## Requirements
 
@@ -65,9 +65,10 @@ class Invoice extends Model
 ```
 
 `#[Immutable(['number', 'customer_id'])]` works as well. It needs at least one
-column and does not take `'*'`; a model declared that way fails when it boots
-with an `InvalidImmutableColumnsException` that names the class carrying the
-attribute.
+column and does not take `'*'`, empty names, non-strings or JSON paths such as
+`'options->currency'`; the guard compares whole columns, so guard `'options'`
+instead. A model declared that way fails when it boots with an
+`InvalidImmutableColumnsException` that names the class carrying the attribute.
 
 ### The whole model
 
@@ -84,6 +85,10 @@ class LedgerEntry extends Model
     use GuardsImmutableAttributes;
 }
 ```
+
+It takes no columns. Passing one, as in `#[ImmutableModel('number')]`, would
+guard more than meant, so it fails when the model boots with an
+`InvalidImmutableColumnsException`; use `#[Immutable('number')]` instead.
 
 ### Inheritance and presets
 
@@ -119,6 +124,20 @@ public function getImmutableAttributes(): array
 }
 ```
 
+The list must hold column names as non-empty strings. Anything else throws an
+`InvalidImmutableColumnsException` naming the model, the first time the list is
+used.
+
+`getOriginal()` is the state this model instance loaded, not the row as it is now.
+Two limits follow:
+
+- A query that leaves `finalized_at` out of its `select()` makes `getOriginal()`
+  return `null`, so the model counts as not finalized.
+- If another process finalizes the row after the model was loaded, this instance
+  still treats it as open and saves. `refresh()` narrows the window but does not
+  close it. Where finalization must be binding, load the row inside a
+  transaction with `lockForUpdate()` and save before the transaction ends.
+
 ### The exception
 
 A violation throws `Taldres\ImmutableAttributes\Exceptions\ImmutableAttributeException`,
@@ -145,10 +164,10 @@ another column.
 | `save()`, `update()`, `push()` | Query builder writes: `Invoice::whereKey($id)->update([...])`, `upsert()`, raw queries |
 | `fill()` and `forceFill()` followed by a save | `incrementQuietly()` and `decrementQuietly()`, which fire no events and write their own query |
 | `saveQuietly()`, `updateQuietly()` and saves inside `Model::withoutEvents()` | `increment()` and `decrement()` inside `Model::withoutEvents()`, for the same reason |
-| Changes made by `updating` listeners and observers | `incrementEachQuietly()` and `decrementEachQuietly()` |
-| `increment()` and `decrement()`, including their extra columns | Deleting and soft deleting |
+| Changes made by `updating` listeners and observers | `incrementEachQuietly()` and `decrementEachQuietly()` on Laravel 13.20 and later |
+| `increment()` and `decrement()`, including the extra columns and the update timestamp they write; an immutable extra column throws even with its current value | Deleting and soft deleting |
 | `incrementEach()` and `decrementEach()` on Laravel 13.3 and later | Parent timestamps touched through `$touches` |
-| `touch()` when the touched column is immutable, such as `updated_at` under `#[ImmutableModel]` | |
+| `touch()` when the touched column is immutable, such as `updated_at` under `#[ImmutableModel]` | `incrementEach()` and `decrementEach()` before Laravel 13.3, which Laravel runs as a query on the whole table |
 | `restore()` when `deleted_at` is immutable, such as under `#[ImmutableModel]` | |
 
 The query builder stays open on purpose: it is the escape hatch for deliberate
@@ -176,6 +195,23 @@ protected function getDirtyForUpdate(): array
     return $dirty;
 }
 ```
+
+The same applies to `incrementOrDecrement()` and, on Laravel 13.3 and later,
+`incrementOrDecrementEach()`: the trait overrides them to check the columns an
+increment writes, so a model that defines them needs the same aliasing and the
+trait's return type, `int|false`.
+
+A key counts as the column it writes, whatever its qualifier: `invoices.number`
+counts as `number`, and `options->currency` counts as `options`. Case does not
+count either, so `NUMBER` is `number`, except on PostgreSQL, where Laravel quotes
+identifiers and `NUMBER` is a different column. Entries returned by
+`getImmutableAttributes()` are matched the same way, so `'options->currency'`
+there guards the whole `options` column. The exception names the attribute as
+declared.
+
+An increment by `0` leaves its column alone but still writes the update
+timestamp of a model with timestamps, so under `#[ImmutableModel]` it throws
+unless it runs inside `Model::withoutTimestamps()`.
 
 ## AI agents
 

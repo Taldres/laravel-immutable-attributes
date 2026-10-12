@@ -23,17 +23,20 @@ class Immutable
     public readonly array $columns;
 
     /**
+     * Takes any value so that a wrong one reaches the same exception as every
+     * other misdeclaration, naming the class, instead of a bare TypeError.
+     *
      * @param  array<int, string>|string  ...$columns
      *
      * @throws InvalidImmutableColumnsException
      */
-    public function __construct(array|string ...$columns)
+    public function __construct(mixed ...$columns)
     {
         $this->columns = $this->columnsFrom($columns);
     }
 
     /**
-     * @param  array<array-key, array<int, string>|string>  $columns
+     * @param  array<array-key, mixed>  $columns
      * @return list<string>
      *
      * @throws InvalidImmutableColumnsException
@@ -43,7 +46,14 @@ class Immutable
         $flattened = [];
 
         foreach ($columns as $column) {
-            array_push($flattened, ...(array) $column);
+            // Not Arr::wrap(): it turns null into an empty list and drops it.
+            foreach (is_array($column) ? $column : [$column] as $name) {
+                if (! is_string($name) || blank($name)) {
+                    throw InvalidImmutableColumnsException::invalid($name);
+                }
+
+                $flattened[] = $name;
+            }
         }
 
         if ($flattened === []) {
@@ -52,6 +62,12 @@ class Immutable
 
         if (in_array('*', $flattened, true)) {
             throw InvalidImmutableColumnsException::wildcard();
+        }
+
+        foreach ($flattened as $name) {
+            if (str_contains($name, '->')) {
+                throw InvalidImmutableColumnsException::jsonPath($name);
+            }
         }
 
         return array_values(array_unique($flattened));
