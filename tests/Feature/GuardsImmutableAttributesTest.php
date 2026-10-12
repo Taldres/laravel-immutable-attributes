@@ -275,6 +275,16 @@ describe('column name aliases', function () {
             ->and($invoice->isImmutableAttribute('invoices.total'))->toBeFalse();
     });
 
+    it('folds case beyond ASCII outside PostgreSQL', function () {
+        ConfiguredInvoice::$frozen = ['café'];
+
+        $invoice = new ConfiguredInvoice;
+
+        expect($invoice->isImmutableAttribute('CAFÉ'))->toBe(! onPostgres())
+            ->and($invoice->isImmutableAttribute('Café'))->toBe(! onPostgres())
+            ->and($invoice->isImmutableAttribute('cafe'))->toBeFalse();
+    });
+
     it('keeps the case of column names on PostgreSQL', function () {
         $invoice = new PostgresInvoice;
 

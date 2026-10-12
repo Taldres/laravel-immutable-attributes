@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use Illuminate\Database\QueryException;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * The guard decides from the key it is given which column the database will
@@ -68,6 +70,30 @@ describe('how the database reads a column name', function () {
 
         expect(storedInvoiceNumber($id))->toBe(in_array(DB::connection()->getDriverName(), ['sqlite', 'pgsql'], true) ? 'INV-999' : 'INV-001');
     });
+
+    it('folds case beyond ASCII in MySQL and MariaDB, but not accents', function () {
+        Schema::create('accented_rows', function (Blueprint $table): void {
+            $table->id();
+            $table->string('café')->nullable();
+        });
+
+        try {
+            $folds = in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true);
+            $id = DB::table('accented_rows')->insertGetId(['café' => 'a']);
+
+            if ($folds) {
+                DB::table('accented_rows')->where('id', $id)->update(['CAFÉ' => 'b']);
+
+                expect(DB::table('accented_rows')->where('id', $id)->value('café'))->toBe('b');
+            } else {
+                expect(fn () => DB::table('accented_rows')->where('id', $id)->update(['CAFÉ' => 'b']))->toThrow(QueryException::class);
+            }
+
+            expect(fn () => DB::table('accented_rows')->where('id', $id)->update(['cafe' => 'c']))->toThrow(QueryException::class);
+        } finally {
+            Schema::dropIfExists('accented_rows');
+        }
+    })->skip(fn () => DB::connection()->getDriverName() === 'sqlite', 'SQLite folds ASCII only, which the test above covers.');
 
     it('writes a JSON path into its column', function () {
         $id = insertInvoiceRow();

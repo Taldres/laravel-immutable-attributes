@@ -175,6 +175,8 @@ trait GuardsImmutableAttributes
      * grammars drop any qualifier, as in "invoices.number". Case counts only on
      * PostgreSQL, where Laravel quotes identifiers and "NUMBER" is a different
      * column, so the connection is asked only when nothing but case differs.
+     * Case is folded for the whole of Unicode: MySQL and MariaDB do so for
+     * "CAFÉ" and "café", while they keep "cafe" apart.
      */
     private function immutableAttributeWrittenBy(string $key): ?string
     {
@@ -191,7 +193,7 @@ trait GuardsImmutableAttributes
                 return $attribute;
             }
 
-            if (strcasecmp($declared, $column) === 0) {
+            if (Str::lower($declared) === Str::lower($column)) {
                 $differentCase ??= $attribute;
             }
         }
