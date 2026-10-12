@@ -45,7 +45,8 @@ class Invoice extends Model
 ```
 
 - `#[ImmutableModel]` guards every attribute: the row is never updated again,
-  not even by `touch()` or `restore()`; deleting stays possible
+  not even by `touch()`, `restore()` or an increment by `0` on a model with
+  timestamps, which still writes `updated_at`; deleting stays possible
 - `#[Immutable]` needs at least one column and rejects `'*'`; a model declared
   that way fails when it boots with `InvalidImmutableColumnsException`, so use
   `#[ImmutableModel]` for the whole model
@@ -54,7 +55,9 @@ class Invoice extends Model
   model uses are merged in
 - override `public function getImmutableAttributes(): array` only when the list
   depends on runtime state; decide on the stored state with `getOriginal()`, not
-  on unsaved attributes, and return `['*']` for the whole model
+  on unsaved attributes, and return `['*']` for the whole model; the original is
+  the state this instance loaded, so select the deciding column and use a
+  transaction with `lockForUpdate()` where another process may finalize the row
 
 ### 3. Handle violations
 
@@ -81,4 +84,7 @@ class Invoice extends Model
 - do not catch `ImmutableAttributeException` to retry the same save
 - do not route normal application writes through the query builder to get around the guard
 - do not rely on the guard for `incrementQuietly()`, `decrementQuietly()`, increments inside `Model::withoutEvents()`, mass updates, `$touches` or deletes; it does not cover them
+- do not call `incrementEach()` or `decrementEach()` on a model before Laravel 13.3; Laravel runs them as an unguarded query on the whole table
 - do not override `getDirtyForUpdate()` on a guarded model without aliasing the trait method and calling it; `parent::getDirtyForUpdate()` skips the guard
+- the same applies to `incrementOrDecrement()` and, on Laravel 13.3 and later, `incrementOrDecrementEach()`: the trait overrides them to check the columns an increment writes, so keep their `int|false` return type
+- a key counts as the column it writes, whatever its qualifier or case (`invoices.number` and `NUMBER` count as `number`, `options->currency` as `options`); case counts only on PostgreSQL, where `NUMBER` is a different column; `#[Immutable]` itself rejects JSON paths, so declare the whole column
