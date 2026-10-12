@@ -31,7 +31,7 @@ looks normal, and the damage shows up much later.
 
 - **`$guarded` does not help.** It only stops mass assignment; `$invoice->number = ...` still goes through
 - **One declaration instead of a listener per model.** The usual fix, an `updating` listener that checks `isDirty()`, ends up copied into every model that needs it
-- **Covers the paths a listener misses.** Saves without events (`saveQuietly()`, `withoutEvents()`) and changes made by a later `updating` listener or observer are caught too
+- **Covers the paths a listener misses.** Saves and increments without events (`saveQuietly()`, `incrementQuietly()`, `withoutEvents()`) and changes made by a later `updating` listener or observer are caught too
 - **Inserts are untouched.** The attributes are set freely until the row exists
 - **Saving the same value is not a change.** A save is checked with Eloquent's own dirty tracking, casts included. An increment is checked by the columns its query writes, because that query bypasses casts
 
@@ -196,12 +196,13 @@ another column.
 | Guarded | Not guarded |
 | --- | --- |
 | `save()`, `update()`, `push()` | Query builder writes: `Invoice::whereKey($id)->update([...])`, `upsert()`, raw queries |
-| `fill()` and `forceFill()` followed by a save | `incrementQuietly()` and `decrementQuietly()`, which fire no events and write their own query |
-| `saveQuietly()`, `updateQuietly()` and saves inside `Model::withoutEvents()` | `increment()` and `decrement()` inside `Model::withoutEvents()`, for the same reason |
-| Changes made by `updating` listeners and observers | `incrementEachQuietly()` and `decrementEachQuietly()` on Laravel 13.20 and later |
-| `increment()` and `decrement()`, including the extra columns and the update timestamp they write; an immutable extra column throws even with its current value | Deleting and soft deleting |
-| `incrementEach()` and `decrementEach()` on Laravel 13.3 and later | Parent timestamps touched through `$touches` |
-| `touch()` when the touched column is immutable, such as `updated_at` under `#[ImmutableModel]` | `incrementEach()` and `decrementEach()` before Laravel 13.3, which Laravel runs as a query on the whole table |
+| `fill()` and `forceFill()` followed by a save | `increment()` and `decrement()` on a model that does not exist yet, which Laravel runs as a query on the whole table |
+| `saveQuietly()`, `updateQuietly()` and saves inside `Model::withoutEvents()` | Deleting and soft deleting |
+| Changes made by `updating` listeners and observers | Parent timestamps touched through `$touches` |
+| `increment()` and `decrement()`, including the extra columns and the update timestamp they write; an immutable extra column throws even with its current value | `incrementEach()` and `decrementEach()` before Laravel 13.3, which Laravel runs as a query on the whole table |
+| `incrementQuietly()` and `decrementQuietly()`, and `increment()` and `decrement()` inside `Model::withoutEvents()` | |
+| `incrementEach()` and `decrementEach()` on Laravel 13.3 and later, and on Laravel 13.20 and later their `Quietly` variants | |
+| `touch()` when the touched column is immutable, such as `updated_at` under `#[ImmutableModel]` | |
 | `restore()` when `deleted_at` is immutable, such as under `#[ImmutableModel]` | |
 
 The query builder stays open on purpose: it is the escape hatch for deliberate
@@ -232,8 +233,9 @@ protected function getDirtyForUpdate(): array
 
 The same applies to `incrementOrDecrement()` and, on Laravel 13.3 and later,
 `incrementOrDecrementEach()`: the trait overrides them to check the columns an
-increment writes, so a model that defines them needs the same aliasing and the
-trait's return type, `int|false`.
+increment writes, before the increment runs and whether or not it fires events,
+so a model that defines them needs the same aliasing and the trait's return
+type, `int|false`. A rejected increment leaves the model as it was.
 
 A key counts as the column it writes, whatever its qualifier: `invoices.number`
 counts as `number`, and `options->currency` counts as `options`. Case does not
