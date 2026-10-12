@@ -960,6 +960,15 @@ describe('outside the model', function () {
         expect(DB::table('invoices')->value('customer_id'))->toBe(8);
     })->skip(! method_exists(Model::class, 'incrementEachQuietly'), 'Model::incrementEachQuietly() arrived in Laravel 13.20.');
 
+    it('leaves increment() on a model that does not exist yet alone, which updates every row', function () {
+        invoice();
+        invoice(['number' => 'INV-002', 'customer_id' => 8]);
+
+        (new Invoice)->increment('customer_id');
+
+        expect(DB::table('invoices')->orderBy('id')->pluck('customer_id')->all())->toBe([8, 9]);
+    });
+
     // @todo Laravel 13.3: Remove with its README row once composer.json requires ^13.3.
     it('leaves incrementEach() before Laravel 13.3 alone, which updates every row', function () {
         $invoice = invoice();

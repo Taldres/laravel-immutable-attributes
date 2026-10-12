@@ -202,7 +202,7 @@ another column.
 | `increment()` and `decrement()`, including the extra columns and the update timestamp they write; an immutable extra column throws even with its current value | Deleting and soft deleting |
 | `incrementEach()` and `decrementEach()` on Laravel 13.3 and later | Parent timestamps touched through `$touches` |
 | `touch()` when the touched column is immutable, such as `updated_at` under `#[ImmutableModel]` | `incrementEach()` and `decrementEach()` before Laravel 13.3, which Laravel runs as a query on the whole table |
-| `restore()` when `deleted_at` is immutable, such as under `#[ImmutableModel]` | |
+| `restore()` when `deleted_at` is immutable, such as under `#[ImmutableModel]` | `increment()` and `decrement()` on a model that does not exist yet, which Laravel runs as a query on the whole table |
 
 The query builder stays open on purpose: it is the escape hatch for deliberate
 corrections, data migrations and erasure.
