@@ -74,6 +74,10 @@ class ImmutableModel extends Immutable
                 throw InvalidImmutableColumnsException::exceptInvalid($name);
             }
 
+            if (static::isPadded($name)) {
+                throw InvalidImmutableColumnsException::exceptPadded($name);
+            }
+
             if ($name === '*') {
                 throw InvalidImmutableColumnsException::exceptWildcard();
             }

@@ -29,6 +29,7 @@ use Taldres\ImmutableAttributes\Tests\Fixtures\Models\MistypedLedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\NarrowedLedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\NarrowerCountedInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\NormalizedInvoice;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\PaddedLedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\PinnedCountedInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\PostgresInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\PresetLedgerEntry;
@@ -894,6 +895,13 @@ describe('resolving the attributes', function () {
         );
     });
 
+    it('rejects a column name with whitespace around it the same way', function () {
+        expect(fn () => new PaddedLedgerEntry)->toThrow(
+            InvalidImmutableColumnsException::class,
+            'takes column names without whitespace around them, "memo " given. Use "memo" instead. Declared on ['.PaddedLedgerEntry::class.'].',
+        );
+    });
+
     it('rejects columns on #[ImmutableModel] the same way', function () {
         expect(fn () => new NarrowedLedgerEntry)->toThrow(
             InvalidImmutableColumnsException::class,
@@ -923,6 +931,19 @@ describe('resolving the attributes', function () {
         'an empty string' => [[''], 'an empty string'],
         'null next to a column' => [['number', null], 'null'],
     ]);
+
+    it('rejects a getImmutableAttributes() override that returns a name with whitespace around it', function () {
+        UnusableInvoice::$returned = ['number', ' customer_id'];
+
+        try {
+            expect(fn () => (new UnusableInvoice)->isImmutableAttribute('number'))->toThrow(
+                InvalidImmutableColumnsException::class,
+                UnusableInvoice::class.'::getImmutableAttributes() must return column names without whitespace around them, " customer_id" given.',
+            );
+        } finally {
+            UnusableInvoice::$returned = [];
+        }
+    });
 
     it('reads presets that extend #[ImmutableModel]', function () {
         $entry = AuditEntry::query()->create(['amount' => 100]);
