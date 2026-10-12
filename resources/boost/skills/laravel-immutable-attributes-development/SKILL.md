@@ -92,7 +92,6 @@ class Invoice extends Model
 - do not catch `ImmutableAttributeException` to retry the same save
 - do not route normal application writes through the query builder to get around the guard
 - do not rely on the guard for mass updates, `$touches`, deletes or an `increment()` on a model that does not exist yet, which Laravel runs as a query on the whole table; it does not cover them
-- do not call `incrementEach()` or `decrementEach()` on a model before Laravel 13.3; Laravel runs them as an unguarded query on the whole table
 - do not override `getDirtyForUpdate()` on a guarded model without aliasing the trait method and calling it; `parent::getDirtyForUpdate()` skips the guard
-- the same applies to `incrementOrDecrement()` and, on Laravel 13.3 and later, `incrementOrDecrementEach()`: the trait overrides them to check the columns an increment writes, even without events, so keep their `int|false` return type
+- the same applies to `incrementOrDecrement()` and `incrementOrDecrementEach()`: the trait overrides them to check the columns an increment writes, even without events, so keep their `int|false` return type
 - a key counts as the column it writes, whatever its qualifier or case (`invoices.number` and `NUMBER` count as `number`, `options->currency` as `options`); case counts only on PostgreSQL, where `NUMBER` is a different column; `#[Immutable]` itself rejects JSON paths, so declare the whole column

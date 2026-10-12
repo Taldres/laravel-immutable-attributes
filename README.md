@@ -7,7 +7,7 @@
 [![Packagist Downloads](https://img.shields.io/packagist/dt/taldres/laravel-immutable-attributes)](https://packagist.org/packages/taldres/laravel-immutable-attributes)
 ![Tests](https://img.shields.io/github/actions/workflow/status/taldres/laravel-immutable-attributes/tests.yml?label=tests)
 ![PHPStan](https://img.shields.io/badge/PHPStan-level%2010-brightgreen)
-![Laravel](https://img.shields.io/badge/Laravel-12%20%7C%2013-red)
+![Laravel](https://img.shields.io/badge/Laravel-13.3%2B-red)
 ![PHP](https://img.shields.io/badge/PHP-8.3%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
@@ -38,7 +38,10 @@ looks normal, and the damage shows up much later.
 ## Requirements
 
 - PHP 8.3+
-- Laravel 12 or 13
+- Laravel 13.3 or later
+
+Laravel 12 is supported by version 1, which receives fixes on the `1.x` branch:
+`composer require taldres/laravel-immutable-attributes:^1.0`.
 
 ## Installation
 
@@ -199,9 +202,9 @@ another column.
 | `fill()` and `forceFill()` followed by a save | `increment()` and `decrement()` on a model that does not exist yet, which Laravel runs as a query on the whole table |
 | `saveQuietly()`, `updateQuietly()` and saves inside `Model::withoutEvents()` | Deleting and soft deleting |
 | Changes made by `updating` listeners and observers | Parent timestamps touched through `$touches` |
-| `increment()` and `decrement()`, including the extra columns and the update timestamp they write; an immutable extra column throws even with its current value | `incrementEach()` and `decrementEach()` before Laravel 13.3, which Laravel runs as a query on the whole table |
+| `increment()` and `decrement()`, including the extra columns and the update timestamp they write; an immutable extra column throws even with its current value | |
 | `incrementQuietly()` and `decrementQuietly()`, and `increment()` and `decrement()` inside `Model::withoutEvents()` | |
-| `incrementEach()` and `decrementEach()` on Laravel 13.3 and later, and on Laravel 13.20 and later their `Quietly` variants | |
+| `incrementEach()` and `decrementEach()`, and on Laravel 13.20 and later their `Quietly` variants | |
 | `touch()` when the touched column is immutable, such as `updated_at` under `#[ImmutableModel]` | |
 | `restore()` when `deleted_at` is immutable, such as under `#[ImmutableModel]` | |
 
@@ -231,11 +234,11 @@ protected function getDirtyForUpdate(): array
 }
 ```
 
-The same applies to `incrementOrDecrement()` and, on Laravel 13.3 and later,
-`incrementOrDecrementEach()`: the trait overrides them to check the columns an
-increment writes, before the increment runs and whether or not it fires events,
-so a model that defines them needs the same aliasing and the trait's return
-type, `int|false`. A rejected increment leaves the model as it was.
+The same applies to `incrementOrDecrement()` and `incrementOrDecrementEach()`:
+the trait overrides them to check the columns an increment writes, before the
+increment runs and whether or not it fires events, so a model that defines them
+needs the same aliasing and the trait's return type, `int|false`. A rejected
+increment leaves the model as it was.
 
 A key counts as the column it writes, whatever its qualifier: `invoices.number`
 counts as `number`, and `options->currency` counts as `options`. Case does not

@@ -468,7 +468,6 @@ describe('incrementing', function () {
         expect(DB::table('invoices')->value('note'))->toBe('Checked');
     });
 
-    // @todo Laravel 13.3: Drop the skip once composer.json requires ^13.3.
     it('leaves incrementEach() by zero alone and throws on a non-zero immutable column', function () {
         $invoice = invoice();
 
@@ -478,16 +477,15 @@ describe('incrementing', function () {
             ->and(DB::table('invoices')->value('total'))->toBe(1005);
         expect(fn () => $invoice->incrementEach(['customer_id' => 1, 'total' => 0]))
             ->toThrow(ImmutableAttributeException::class);
-    })->skip(! method_exists(Model::class, 'incrementEach'), 'Model::incrementEach() arrived in Laravel 13.3.');
+    });
 
-    // @todo Laravel 13.3: Drop the skip once composer.json requires ^13.3.
     it('throws on incrementEach() when a setter hides a change to an extra attribute', function () {
         $invoice = NormalizedInvoice::query()->create(['number' => 'INV-001', 'customer_id' => 7, 'issued_at' => now()]);
 
         expect(fn () => $invoice->incrementEach(['total' => 1], ['number' => ' inv-001 ']))
             ->toThrow(ImmutableAttributeException::class);
         expect(DB::table('invoices')->value('number'))->toBe('INV-001');
-    })->skip(! method_exists(Model::class, 'incrementEach'), 'Model::incrementEach() arrived in Laravel 13.3.');
+    });
 
     it('throws on the Quietly variants of increment() and decrement()', function (Closure $change) {
         $invoice = invoice();
@@ -547,9 +545,7 @@ describe('incrementing', function () {
     })->with([
         'increment()' => fn (Invoice $invoice) => $invoice->increment('total'),
         'incrementQuietly()' => fn (Invoice $invoice) => $invoice->incrementQuietly('total'),
-        ...(method_exists(Model::class, 'incrementEach') ? [
-            'incrementEach()' => fn (Invoice $invoice) => $invoice->incrementEach(['total' => 1]),
-        ] : []),
+        'incrementEach()' => fn (Invoice $invoice) => $invoice->incrementEach(['total' => 1]),
     ]);
 
     it('increments mutable attributes', function () {
@@ -560,7 +556,6 @@ describe('incrementing', function () {
         expect($invoice->fresh()?->total)->toBe(1050);
     });
 
-    // @todo Laravel 13.3: Drop the skip once composer.json requires ^13.3.
     it('throws on incrementEach() and decrementEach()', function (Closure $change) {
         $invoice = invoice();
 
@@ -570,7 +565,7 @@ describe('incrementing', function () {
     })->with([
         'incrementEach()' => fn (Invoice $invoice) => $invoice->incrementEach(['customer_id' => 1]),
         'decrementEach() with extra columns' => fn (Invoice $invoice) => $invoice->decrementEach(['total' => 1], ['number' => 'INV-999']),
-    ])->skip(! method_exists(Model::class, 'incrementEach'), 'Model::incrementEach() arrived in Laravel 13.3.');
+    ]);
 });
 
 describe('the whole model', function () {
@@ -677,7 +672,6 @@ describe('leaving columns out of the whole model', function () {
         expect($invoice->touch())->toBeTrue();
     });
 
-    // @todo Laravel 13.3: Drop the skip once composer.json requires ^13.3.
     it('counts up several columns it leaves out with incrementEach()', function () {
         $invoice = countedInvoice();
 
@@ -687,7 +681,7 @@ describe('leaving columns out of the whole model', function () {
             ->and(DB::table('invoices')->value('note'))->toBe('Checked');
         expect(fn () => $invoice->incrementEach(['total' => 1, 'customer_id' => 1]))
             ->toThrow(fn (ImmutableAttributeException $e) => expect($e->attributes)->toBe(['customer_id']));
-    })->skip(! method_exists(Model::class, 'incrementEach'), 'Model::incrementEach() arrived in Laravel 13.3.');
+    });
 
     it('guards a save without events the same way', function () {
         $invoice = countedInvoice();
@@ -1004,16 +998,6 @@ describe('outside the model', function () {
 
         expect(DB::table('invoices')->orderBy('id')->pluck('customer_id')->all())->toBe([8, 9]);
     });
-
-    // @todo Laravel 13.3: Remove with its README row once composer.json requires ^13.3.
-    it('leaves incrementEach() before Laravel 13.3 alone, which updates every row', function () {
-        $invoice = invoice();
-        invoice(['number' => 'INV-002', 'customer_id' => 8]);
-
-        $invoice->incrementEach(['customer_id' => 1]);
-
-        expect(DB::table('invoices')->orderBy('id')->pluck('customer_id')->all())->toBe([8, 9]);
-    })->skip(method_exists(Model::class, 'incrementEach'), 'Model::incrementEach() updates only its own row since Laravel 13.3.');
 
     it('leaves parent timestamps touched through $touches alone', function () {
         $invoice = LockedInvoice::query()->create([
