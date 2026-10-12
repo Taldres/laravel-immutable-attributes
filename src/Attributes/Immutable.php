@@ -53,6 +53,10 @@ class Immutable
                 throw InvalidImmutableColumnsException::invalid($name);
             }
 
+            if (static::isPadded($name)) {
+                throw InvalidImmutableColumnsException::padded($name);
+            }
+
             $flattened[] = $name;
         }
 
@@ -71,5 +75,14 @@ class Immutable
         }
 
         return array_values(array_unique($flattened));
+    }
+
+    /**
+     * A name with whitespace around it, a non-breaking space included, would be
+     * guarded under that name and never match the column.
+     */
+    protected static function isPadded(string $name): bool
+    {
+        return preg_match('/^\s|\s$/u', $name) === 1;
     }
 }

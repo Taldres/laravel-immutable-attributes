@@ -1,6 +1,27 @@
 # Release Notes
 
-## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.3.0...1.x)
+## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.4.1...main)
+
+## [v1.4.1](https://github.com/taldres/laravel-immutable-attributes/compare/v1.3.0...v1.4.1) - 2026-10-12
+
+#### Upgrade notes
+
+- **A column name with whitespace around it now throws.** `#[Immutable(' number')]`, a name with a trailing space, a tab or a non-breaking space, in `#[Immutable]`, in the `except` of `#[ImmutableModel]` or in the list of a `getImmutableAttributes()` or `getMutableAttributes()` override used to boot and guard nothing for that name, because it never matched the column. It now raises `InvalidImmutableColumnsException` when the model boots, or when the list of an override is used. The message names the class and shows the name with its escapes, so that a space that cannot be seen is visible. Remove the whitespace.
+- Names without whitespace around them behave as before. A space inside a name, as in `num ber`, is still a name.
+- **There is no 1.4.0.** It was cut from the wrong branch and withdrawn, and Packagist does not take a version number again after it was removed. 1.4.1 carries the changes that 1.4.0 was meant to have.
+
+<!-- Release notes generated using configuration in .github/release.yml at 1.x -->
+### What's Changed
+
+#### Bug Fixes
+
+* Reject column names with whitespace around them by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/20
+
+#### Maintenance
+
+* Let main call the test workflows of 1.x by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/18
+
+**Full Changelog**: https://github.com/Taldres/laravel-immutable-attributes/compare/v1.3.0...v1.4.1
 
 ## [v1.3.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.2.0...v1.3.0) - 2026-10-12
 

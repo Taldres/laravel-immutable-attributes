@@ -68,8 +68,8 @@ class Invoice extends Model
 ```
 
 `#[Immutable(['number', 'customer_id'])]` works as well. It needs at least one
-column and does not take `'*'`, empty names, non-strings or JSON paths such as
-`'options->currency'`; the guard compares whole columns, so guard `'options'`
+column and does not take `'*'`, empty names, names with whitespace around them,
+non-strings or JSON paths such as `'options->currency'`; the guard compares whole columns, so guard `'options'`
 instead. A model declared that way fails when it boots with an
 `InvalidImmutableColumnsException` that names the class carrying the attribute.
 
@@ -161,7 +161,8 @@ With `['*']`, `getMutableAttributes()` lists what stays mutable, the same list
 `except` fills. Override it as well to decide that at runtime; an attribute that
 `getImmutableAttributes()` names is guarded all the same.
 
-The list must hold column names as non-empty strings. Anything else throws an
+The list must hold column names as non-empty strings without whitespace around
+them. Anything else throws an
 `InvalidImmutableColumnsException` naming the model, the first time the list is
 used.
 

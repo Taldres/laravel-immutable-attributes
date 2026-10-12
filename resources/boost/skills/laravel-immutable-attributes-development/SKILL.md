@@ -64,7 +64,8 @@ class Invoice extends Model
   listing what it leaves out; the original is
   the state this instance loaded, so select the deciding column and use a
   transaction with `lockForUpdate()` where another process may finalize the row;
-  return column names as non-empty strings, anything else throws
+  return column names as non-empty strings without whitespace around them,
+  anything else throws
   `InvalidImmutableColumnsException`
 
 ### 3. Handle violations

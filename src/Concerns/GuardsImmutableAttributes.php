@@ -246,7 +246,7 @@ trait GuardsImmutableAttributes
      */
     private function assertColumnName(mixed $attribute, string $method): void
     {
-        if (! is_string($attribute) || trim($attribute) === '') {
+        if (! is_string($attribute) || trim($attribute) === '' || preg_match('/^\s|\s$/u', $attribute) === 1) {
             throw InvalidImmutableColumnsException::returnedBy(static::class, $method, $attribute);
         }
     }
