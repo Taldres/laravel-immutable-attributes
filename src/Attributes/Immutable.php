@@ -46,8 +46,9 @@ class Immutable
         $flattened = [];
 
         foreach ($columns as $column) {
+            // Not Arr::wrap(): it turns null into an empty list and drops it.
             foreach (is_array($column) ? $column : [$column] as $name) {
-                if (! is_string($name) || trim($name) === '') {
+                if (! is_string($name) || blank($name)) {
                     throw InvalidImmutableColumnsException::invalid($name);
                 }
 

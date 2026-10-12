@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Taldres\ImmutableAttributes\Exceptions;
 
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 /**
@@ -42,7 +43,7 @@ class InvalidImmutableColumnsException extends InvalidArgumentException
 
     public static function jsonPath(string $column): self
     {
-        $attribute = explode('->', $column)[0];
+        $attribute = Str::before($column, '->');
 
         return new self("#[Immutable] cannot guard the JSON path \"{$column}\". Guard the whole column with #[Immutable('{$attribute}')] instead.");
     }

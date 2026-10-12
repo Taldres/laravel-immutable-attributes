@@ -213,7 +213,7 @@ trait GuardsImmutableAttributes
      */
     private function assertColumnName(mixed $attribute): void
     {
-        if (! is_string($attribute) || trim($attribute) === '') {
+        if (! is_string($attribute) || blank($attribute)) {
             throw InvalidImmutableColumnsException::returnedBy(static::class, $attribute);
         }
     }
