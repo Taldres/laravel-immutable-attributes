@@ -1,6 +1,33 @@
 # Release Notes
 
-## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.2.0...HEAD)
+## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.3.0...1.x)
+
+## [v1.3.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.2.0...v1.3.0) - 2026-10-12
+
+### Upgrade notes
+
+- **Increments without events are guarded.** `incrementQuietly()`, `decrementQuietly()` and `increment()` or `decrement()` inside `Model::withoutEvents()` used to be a way around the guard, and so were the `*Each` variants and their `Quietly` variants where Laravel has them. They now throw `ImmutableAttributeException` for an immutable column, like the same call with events does. To change such a column on purpose, write through the query builder, `Invoice::query()->whereKey($id)->update([...])`, or allow the column explicitly with `except` on `#[ImmutableModel]`.
+- **A rejected increment leaves the model as it was.** The check runs before the increment, so the model no longer holds the incremented value after the exception.
+- **Removed:** the protected property `$pendingIncrementColumns`, which 1.1.0 added to guarded models. Nothing in the package reads it any more.
+- **Unchanged and now documented:** `increment()` on a model that does not exist yet stays a query on the whole table, as in Laravel itself, and is not guarded.
+
+<!-- Release notes generated using configuration in .github/release.yml at 1.x -->
+### What's Changed
+
+#### Bug Fixes
+
+* Guard increments and decrements that fire no events by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/10
+
+#### Documentation
+
+* Document increments on a model that does not exist yet by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/9
+* Document releases from a maintenance branch by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/14
+
+#### Maintenance
+
+* Update the changelog of the branch that was released by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/13
+
+**Full Changelog**: https://github.com/Taldres/laravel-immutable-attributes/compare/v1.2.0...v1.3.0
 
 ## [v1.2.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.1.0...v1.2.0) - 2026-10-12
 

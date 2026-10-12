@@ -489,6 +489,69 @@ describe('incrementing', function () {
         expect(DB::table('invoices')->value('number'))->toBe('INV-001');
     })->skip(! method_exists(Model::class, 'incrementEach'), 'Model::incrementEach() arrived in Laravel 13.3.');
 
+    it('throws on the Quietly variants of increment() and decrement()', function (Closure $change) {
+        $invoice = invoice();
+
+        expect(fn () => $change($invoice))->toThrow(ImmutableAttributeException::class);
+        expect(DB::table('invoices')->value('customer_id'))->toBe(7)
+            ->and($invoice->customer_id)->toBe(7);
+    })->with([
+        'incrementQuietly()' => fn (Invoice $invoice) => $invoice->incrementQuietly('customer_id'),
+        'decrementQuietly()' => fn (Invoice $invoice) => $invoice->decrementQuietly('customer_id', 2),
+        'incrementQuietly() with an immutable extra attribute' => fn (Invoice $invoice) => $invoice->incrementQuietly('total', 1, ['number' => 'INV-999']),
+        'increment() inside Model::withoutEvents()' => fn (Invoice $invoice) => Model::withoutEvents(fn () => $invoice->increment('customer_id')),
+    ]);
+
+    // @todo Laravel 13.20: Drop the skip once composer.json requires ^13.20.
+    it('throws on incrementEachQuietly() and decrementEachQuietly()', function (Closure $change) {
+        $invoice = invoice();
+
+        expect(fn () => $change($invoice))->toThrow(ImmutableAttributeException::class);
+        expect(DB::table('invoices')->value('customer_id'))->toBe(7);
+    })->with([
+        'incrementEachQuietly()' => fn (Invoice $invoice) => $invoice->incrementEachQuietly(['customer_id' => 2]),
+        'decrementEachQuietly()' => fn (Invoice $invoice) => $invoice->decrementEachQuietly(['customer_id' => 1]),
+    ])->skip(! method_exists(Model::class, 'incrementEachQuietly'), 'Model::incrementEachQuietly() arrived in Laravel 13.20.');
+
+    it('counts up a mutable column quietly', function () {
+        $invoice = invoice();
+
+        $invoice->incrementQuietly('total', 5);
+        Model::withoutEvents(fn () => $invoice->decrementQuietly('total', 2));
+
+        expect(DB::table('invoices')->value('total'))->toBe(1003);
+    });
+
+    it('leaves the model unchanged when it rejects an increment', function () {
+        $invoice = invoice();
+
+        expect(fn () => $invoice->increment('customer_id', 1, ['note' => 'Checked']))->toThrow(ImmutableAttributeException::class);
+        expect($invoice->customer_id)->toBe(7)
+            ->and($invoice->note)->toBeNull()
+            ->and($invoice->isDirty())->toBeFalse();
+    });
+
+    it('throws on an increment of another column while an immutable change is unsaved', function (Closure $change) {
+        $invoice = invoice();
+
+        $invoice->number = 'INV-999';
+
+        expect(fn () => $change($invoice))
+            ->toThrow(fn (ImmutableAttributeException $e) => expect($e->attributes)->toBe(['number']));
+        expect(DB::table('invoices')->value('total'))->toBe(1000);
+
+        $invoice->refresh();
+        $change($invoice);
+
+        expect(DB::table('invoices')->value('total'))->toBe(1001);
+    })->with([
+        'increment()' => fn (Invoice $invoice) => $invoice->increment('total'),
+        'incrementQuietly()' => fn (Invoice $invoice) => $invoice->incrementQuietly('total'),
+        ...(method_exists(Model::class, 'incrementEach') ? [
+            'incrementEach()' => fn (Invoice $invoice) => $invoice->incrementEach(['total' => 1]),
+        ] : []),
+    ]);
+
     it('increments mutable attributes', function () {
         $invoice = invoice();
 
@@ -933,32 +996,14 @@ describe('outside the model', function () {
         expect(storedNumber($invoice))->toBe('INV-999');
     });
 
-    it('leaves incrementQuietly() and decrementQuietly() alone, which fire no events', function () {
-        $invoice = invoice();
+    it('leaves increment() on a model that does not exist yet alone, which updates every row', function () {
+        invoice();
+        invoice(['number' => 'INV-002', 'customer_id' => 8]);
 
-        $invoice->incrementQuietly('customer_id');
-        $invoice->decrementQuietly('customer_id', 2);
+        (new Invoice)->increment('customer_id');
 
-        expect(DB::table('invoices')->value('customer_id'))->toBe(6);
+        expect(DB::table('invoices')->orderBy('id')->pluck('customer_id')->all())->toBe([8, 9]);
     });
-
-    it('leaves increment() inside Model::withoutEvents() alone', function () {
-        $invoice = invoice();
-
-        Model::withoutEvents(fn () => $invoice->increment('customer_id'));
-
-        expect(DB::table('invoices')->value('customer_id'))->toBe(8);
-    });
-
-    // @todo Laravel 13.20: Drop the skip once composer.json requires ^13.20.
-    it('leaves incrementEachQuietly() and decrementEachQuietly() alone', function () {
-        $invoice = invoice();
-
-        $invoice->incrementEachQuietly(['customer_id' => 2]);
-        $invoice->decrementEachQuietly(['customer_id' => 1]);
-
-        expect(DB::table('invoices')->value('customer_id'))->toBe(8);
-    })->skip(! method_exists(Model::class, 'incrementEachQuietly'), 'Model::incrementEachQuietly() arrived in Laravel 13.20.');
 
     // @todo Laravel 13.3: Remove with its README row once composer.json requires ^13.3.
     it('leaves incrementEach() before Laravel 13.3 alone, which updates every row', function () {
