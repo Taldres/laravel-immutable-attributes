@@ -90,11 +90,38 @@ It takes no columns. Passing one, as in `#[ImmutableModel('number')]`, would
 guard more than meant, so it fails when the model boots with an
 `InvalidImmutableColumnsException`; use `#[Immutable('number')]` instead.
 
+#### Leaving columns out
+
+Name the columns that may still change with the named argument `except`, the
+way `$fillable` lets columns through a guarded `*`. Every other column, and every
+column you add to the table later, stays guarded:
+
+```php
+#[ImmutableModel(except: ['views', 'updated_at'])]
+class Article extends Model
+{
+    use GuardsImmutableAttributes;
+}
+
+$article->increment('views'); // allowed
+$article->update(['title' => 'New title']); // ImmutableAttributeException
+```
+
+`except` is a named argument on purpose: a positional `#[ImmutableModel('views')]`
+would read as "guard everything but `views`", the opposite of what
+`#[Immutable('views')]` means, so it is rejected.
+
+Every save and every increment also writes `updated_at`. Leave it out as well,
+as above, or the counter throws; `Model::withoutTimestamps()` is the other way
+out. A column that `#[Immutable]` names stays guarded even if `except` lists it.
+
 ### Inheritance and presets
 
 Declarations stack: `#[Immutable]` and `#[ImmutableModel]` on a parent model, on
 the model itself, and on any trait they use are merged, so a child model can add
-attributes but never release one.
+attributes but never release one. With several `#[ImmutableModel]`, only the
+columns that all of them leave out stay mutable, and one without `except` leaves
+out nothing.
 
 Both attributes can be extended for a named preset. The subclass needs its own
 `#[Attribute]` marker:
@@ -110,6 +137,9 @@ class Ledger extends ImmutableModel
 }
 ```
 
+A preset can fix its `except` by calling `parent::__construct(except: ['memo'])`
+in its own constructor.
+
 ### Deciding at runtime
 
 Override `getImmutableAttributes()` and return the guarded attributes, or `['*']`
@@ -123,6 +153,10 @@ public function getImmutableAttributes(): array
     return $this->getOriginal('finalized_at') !== null ? ['*'] : ['number'];
 }
 ```
+
+With `['*']`, `getMutableAttributes()` lists what stays mutable, the same list
+`except` fills. Override it as well to decide that at runtime; an attribute that
+`getImmutableAttributes()` names is guarded all the same.
 
 The list must hold column names as non-empty strings. Anything else throws an
 `InvalidImmutableColumnsException` naming the model, the first time the list is

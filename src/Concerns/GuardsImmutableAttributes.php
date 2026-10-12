@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 use ReflectionAttribute;
 use ReflectionClass;
 use Taldres\ImmutableAttributes\Attributes\Immutable;
+use Taldres\ImmutableAttributes\Attributes\ImmutableModel;
 use Taldres\ImmutableAttributes\Exceptions\ImmutableAttributeException;
 use Taldres\ImmutableAttributes\Exceptions\InvalidImmutableColumnsException;
 
@@ -23,6 +24,11 @@ trait GuardsImmutableAttributes
     protected static array $resolvedImmutableAttributes = [];
 
     /**
+     * @var array<class-string, list<string>>
+     */
+    protected static array $resolvedMutableAttributes = [];
+
+    /**
      * The columns an increment or decrement is about to write to the database.
      *
      * @var list<string>
@@ -34,6 +40,7 @@ trait GuardsImmutableAttributes
         // Resolve now, so a misconfigured #[Immutable] fails when the model
         // boots rather than on its first update.
         static::$resolvedImmutableAttributes[static::class] ??= static::resolveImmutableAttributes();
+        static::$resolvedMutableAttributes[static::class] ??= static::resolveMutableAttributes();
 
         // Model increment() and decrement() write through their own query and
         // never reach getDirtyForUpdate(), but they do fire "updating".
@@ -50,6 +57,18 @@ trait GuardsImmutableAttributes
     public function getImmutableAttributes(): array
     {
         return static::$resolvedImmutableAttributes[static::class] ??= static::resolveImmutableAttributes();
+    }
+
+    /**
+     * The attributes that stay mutable although "*" guards the model, the way
+     * Laravel's getFillable() lists what a guarded "*" lets through. An
+     * attribute that getImmutableAttributes() names is guarded all the same.
+     *
+     * @return list<string>
+     */
+    public function getMutableAttributes(): array
+    {
+        return static::$resolvedMutableAttributes[static::class] ??= static::resolveMutableAttributes();
     }
 
     public function isImmutableAttribute(string $key): bool
@@ -170,31 +189,54 @@ trait GuardsImmutableAttributes
 
     /**
      * The immutable attribute a key writes, as declared, or the written column
-     * when the whole model is guarded. A key counts as the column it writes:
-     * "options->currency" writes "options", and the SQLite and PostgreSQL
-     * grammars drop any qualifier, as in "invoices.number". Case counts only on
-     * PostgreSQL, where Laravel quotes identifiers and "NUMBER" is a different
-     * column, so the connection is asked only when nothing but case differs.
-     * Case is folded for the whole of Unicode: MySQL and MariaDB do so for
-     * "CAFÉ" and "café", while they keep "cafe" apart.
+     * when "*" guards the model and the column is not left out. A key counts as
+     * the column it writes: "options->currency" writes "options", and the SQLite
+     * and PostgreSQL grammars drop any qualifier, as in "invoices.number".
      */
     private function immutableAttributeWrittenBy(string $key): ?string
     {
         $column = self::columnWrittenBy($key);
         $immutable = $this->getImmutableAttributes();
+
+        array_walk($immutable, fn (mixed $attribute) => $this->assertColumnName($attribute, 'getImmutableAttributes'));
+
+        if (($declared = $this->listedColumn($immutable, $column)) !== null) {
+            return $declared;
+        }
+
+        if (! in_array('*', $immutable, true)) {
+            return null;
+        }
+
+        $mutable = $this->getMutableAttributes();
+
+        array_walk($mutable, fn (mixed $attribute) => $this->assertColumnName($attribute, 'getMutableAttributes'));
+
+        return $this->listedColumn($mutable, $column) === null ? $column : null;
+    }
+
+    /**
+     * The entry of the list that names the column, as listed. Case counts only
+     * on PostgreSQL, where Laravel quotes identifiers and "NUMBER" is a
+     * different column, so the connection is asked only when nothing but case
+     * differs. Case is folded for the whole of Unicode: MySQL and MariaDB do so
+     * for "CAFÉ" and "café", while they keep "cafe" apart.
+     *
+     * @param  list<string>  $columns
+     */
+    private function listedColumn(array $columns, string $column): ?string
+    {
         $differentCase = null;
 
-        array_walk($immutable, $this->assertColumnName(...));
+        foreach ($columns as $listed) {
+            $name = self::columnWrittenBy($listed);
 
-        foreach ($immutable as $attribute) {
-            $declared = self::columnWrittenBy($attribute);
-
-            if ($declared === $column) {
-                return $attribute;
+            if ($name === $column) {
+                return $listed;
             }
 
-            if (Str::lower($declared) === Str::lower($column)) {
-                $differentCase ??= $attribute;
+            if (mb_strtolower($name, 'UTF-8') === mb_strtolower($column, 'UTF-8')) {
+                $differentCase ??= $listed;
             }
         }
 
@@ -202,19 +244,20 @@ trait GuardsImmutableAttributes
             return $differentCase;
         }
 
-        return in_array('*', $immutable, true) ? $column : null;
+        return null;
     }
 
     /**
-     * An override of getImmutableAttributes() is the application's own code, so
-     * what it returns is checked the way a declaration is.
+     * An override of getImmutableAttributes() or getMutableAttributes() is the
+     * application's own code, so what it returns is checked the way a
+     * declaration is.
      *
      * @throws InvalidImmutableColumnsException
      */
-    private function assertColumnName(mixed $attribute): void
+    private function assertColumnName(mixed $attribute, string $method): void
     {
-        if (! is_string($attribute) || blank($attribute)) {
-            throw InvalidImmutableColumnsException::returnedBy(static::class, $attribute);
+        if (! is_string($attribute) || trim($attribute) === '') {
+            throw InvalidImmutableColumnsException::returnedBy(static::class, $method, $attribute);
         }
     }
 
@@ -228,7 +271,32 @@ trait GuardsImmutableAttributes
      */
     protected static function resolveImmutableAttributes(): array
     {
-        return array_values(array_unique(self::immutableColumnsDeclaredOn(new ReflectionClass(static::class))));
+        $columns = [];
+
+        foreach (self::attributesDeclaredOn(new ReflectionClass(static::class)) as $attribute) {
+            array_push($columns, ...$attribute->columns);
+        }
+
+        return array_values(array_unique($columns));
+    }
+
+    /**
+     * What every #[ImmutableModel] leaves out, so that a child model or a trait
+     * can guard more than its parent but never less.
+     *
+     * @return list<string>
+     */
+    protected static function resolveMutableAttributes(): array
+    {
+        $lists = [];
+
+        foreach (self::attributesDeclaredOn(new ReflectionClass(static::class)) as $attribute) {
+            if ($attribute instanceof ImmutableModel) {
+                $lists[] = $attribute->except;
+            }
+        }
+
+        return $lists === [] ? [] : array_values(array_intersect(...$lists));
     }
 
     /**
@@ -238,30 +306,30 @@ trait GuardsImmutableAttributes
      * @template TClass of object
      *
      * @param  ReflectionClass<TClass>  $class
-     * @return list<string>
+     * @return list<Immutable>
      *
      * @throws InvalidImmutableColumnsException
      */
-    private static function immutableColumnsDeclaredOn(ReflectionClass $class): array
+    private static function attributesDeclaredOn(ReflectionClass $class): array
     {
-        $columns = [];
+        $attributes = [];
 
         foreach ($class->getAttributes(Immutable::class, ReflectionAttribute::IS_INSTANCEOF) as $attribute) {
             try {
-                array_push($columns, ...$attribute->newInstance()->columns);
+                $attributes[] = $attribute->newInstance();
             } catch (InvalidImmutableColumnsException $e) {
                 throw $e->declaredOn($class->getName());
             }
         }
 
         foreach ($class->getTraits() as $trait) {
-            array_push($columns, ...self::immutableColumnsDeclaredOn($trait));
+            array_push($attributes, ...self::attributesDeclaredOn($trait));
         }
 
         if ($parent = $class->getParentClass()) {
-            array_push($columns, ...self::immutableColumnsDeclaredOn($parent));
+            array_push($attributes, ...self::attributesDeclaredOn($parent));
         }
 
-        return $columns;
+        return $attributes;
     }
 }

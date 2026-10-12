@@ -51,12 +51,17 @@ class Invoice extends Model
   that way fails when it boots with `InvalidImmutableColumnsException`, so use
   `#[ImmutableModel]` for the whole model; `#[ImmutableModel]` takes no columns
   and fails the same way if given one
+- `#[ImmutableModel(except: ['views', 'updated_at'])]` guards the whole model
+  except the columns named, including columns added later; `except` is named on
+  purpose, a positional column is rejected; leave `updated_at` out for counters,
+  because every save and increment writes it; `#[Immutable]` wins over `except`
 - the trait is required; an attribute alone does nothing
 - `#[Immutable]` and `#[ImmutableModel]` on a parent model or on a trait the
   model uses are merged in
 - override `public function getImmutableAttributes(): array` only when the list
   depends on runtime state; decide on the stored state with `getOriginal()`, not
-  on unsaved attributes, and return `['*']` for the whole model; the original is
+  on unsaved attributes, and return `['*']` for the whole model, with `getMutableAttributes()`
+  listing what it leaves out; the original is
   the state this instance loaded, so select the deciding column and use a
   transaction with `lockForUpdate()` where another process may finalize the row;
   return column names as non-empty strings, anything else throws

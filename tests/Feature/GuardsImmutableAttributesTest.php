@@ -15,19 +15,29 @@ use Taldres\ImmutableAttributes\Tests\Fixtures\Casts\AsCents;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Casts\Cents;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Concerns\HasEmptyImmutableList;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\AuditEntry;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\ClosedCountedInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\ConfiguredInvoice;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\CountedInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\CreditNote;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\Invoice;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\JsonCountedInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\LedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\LockedInvoice;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\MisdeclaredExceptInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\MisdeclaredLedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\MistypedLedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\NarrowedLedgerEntry;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\NarrowerCountedInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\NormalizedInvoice;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\PinnedCountedInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\PostgresInvoice;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\PresetLedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\RestampedInvoice;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\RestorableLedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\SoftDeletingLedgerEntry;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\TotalOnlyInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\TouchingLedgerEntry;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\TraitCountedInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\UnusableInvoice;
 
 /**
@@ -545,6 +555,205 @@ describe('the whole model', function () {
     });
 });
 
+describe('leaving columns out of the whole model', function () {
+    function countedInvoice(string $class = CountedInvoice::class): Model
+    {
+        return $class::query()->create(['number' => 'INV-001', 'customer_id' => 7, 'issued_at' => now(), 'total' => 1000]);
+    }
+
+    it('lets the columns it leaves out change', function () {
+        $invoice = countedInvoice();
+
+        $this->travel(5)->minutes();
+
+        expect($invoice->update(['total' => 2000, 'note' => 'Checked']))->toBeTrue();
+        expect(DB::table('invoices')->value('total'))->toBe(2000)
+            ->and(DB::table('invoices')->value('note'))->toBe('Checked');
+    });
+
+    it('still guards every other column', function () {
+        $invoice = countedInvoice();
+
+        expect(fn () => $invoice->update(['total' => 2000, 'number' => 'INV-999', 'customer_id' => 8]))
+            ->toThrow(fn (ImmutableAttributeException $e) => expect($e->attributes)->toBe(['number', 'customer_id']));
+        expect(DB::table('invoices')->value('total'))->toBe(1000);
+    });
+
+    it('counts up a column it leaves out, with the update timestamp it writes', function () {
+        $invoice = countedInvoice();
+
+        $invoice->increment('total', 5);
+
+        expect(DB::table('invoices')->value('total'))->toBe(1005);
+    });
+
+    it('throws on a counter when the update timestamp is not left out', function () {
+        $invoice = countedInvoice(TotalOnlyInvoice::class);
+
+        $this->travel(5)->minutes();
+
+        expect(fn () => $invoice->increment('total'))
+            ->toThrow(fn (ImmutableAttributeException $e) => expect($e->attributes)->toBe(['updated_at']));
+        expect(fn () => $invoice->update(['total' => 2000]))->toThrow(ImmutableAttributeException::class, '[updated_at]');
+        expect(DB::table('invoices')->value('total'))->toBe(1000);
+    });
+
+    it('counts up without the update timestamp when it is not left out', function () {
+        $invoice = countedInvoice(TotalOnlyInvoice::class);
+
+        TotalOnlyInvoice::withoutTimestamps(fn () => $invoice->increment('total'));
+
+        expect(DB::table('invoices')->value('total'))->toBe(1001);
+    });
+
+    it('touches a model that leaves out the update timestamp', function () {
+        $invoice = countedInvoice();
+
+        $this->travel(5)->minutes();
+
+        expect($invoice->touch())->toBeTrue();
+    });
+
+    // @todo Laravel 13.3: Drop the skip once composer.json requires ^13.3.
+    it('counts up several columns it leaves out with incrementEach()', function () {
+        $invoice = countedInvoice();
+
+        $invoice->incrementEach(['total' => 5, 'customer_id' => 0], ['note' => 'Checked']);
+
+        expect(DB::table('invoices')->value('total'))->toBe(1005)
+            ->and(DB::table('invoices')->value('note'))->toBe('Checked');
+        expect(fn () => $invoice->incrementEach(['total' => 1, 'customer_id' => 1]))
+            ->toThrow(fn (ImmutableAttributeException $e) => expect($e->attributes)->toBe(['customer_id']));
+    })->skip(! method_exists(Model::class, 'incrementEach'), 'Model::incrementEach() arrived in Laravel 13.3.');
+
+    it('guards a save without events the same way', function () {
+        $invoice = countedInvoice();
+
+        $invoice->total = 2000;
+        $invoice->note = 'Checked';
+
+        expect($invoice->saveQuietly())->toBeTrue();
+
+        $invoice->number = 'INV-999';
+
+        expect(fn () => $invoice->saveQuietly())
+            ->toThrow(fn (ImmutableAttributeException $e) => expect($e->attributes)->toBe(['number']));
+    });
+
+    it('restores a deleted row only when deleted_at is left out', function () {
+        $entry = RestorableLedgerEntry::query()->create(['amount' => 100]);
+
+        $entry->delete();
+
+        expect($entry->restore())->toBeTrue();
+        expect(DB::table('ledger_entries')->value('deleted_at'))->toBeNull();
+        expect(fn () => $entry->update(['amount' => 200]))->toThrow(ImmutableAttributeException::class, '[amount]');
+    });
+
+    it('writes a JSON path into a column it leaves out', function () {
+        $invoice = countedInvoice(JsonCountedInvoice::class);
+
+        expect((new JsonCountedInvoice)->isImmutableAttribute('options->currency'))->toBeFalse();
+        expect($invoice->update(['options->currency' => 'USD']))->toBeTrue();
+        expect(json_decode((string) DB::table('invoices')->value('options'), true))->toBe(['currency' => 'USD']);
+    });
+
+    it('leaves out only what a trait and the model both leave out', function () {
+        expect((new TraitCountedInvoice)->getMutableAttributes())->toEqualCanonicalizing(['note', 'updated_at']);
+
+        $invoice = countedInvoice(TraitCountedInvoice::class);
+
+        expect(fn () => $invoice->update(['total' => 2000]))->toThrow(ImmutableAttributeException::class, '[total]');
+        expect($invoice->refresh()->update(['note' => 'Checked']))->toBeTrue();
+    });
+
+    it('lists what it leaves out', function () {
+        expect((new CountedInvoice)->getMutableAttributes())->toBe(['total', 'note', 'updated_at'])
+            ->and((new CountedInvoice)->getImmutableAttributes())->toBe(['*'])
+            ->and((new Invoice)->getMutableAttributes())->toBe([]);
+    });
+
+    it('answers for each key whether it is guarded', function () {
+        $invoice = new CountedInvoice;
+
+        expect($invoice->isImmutableAttribute('number'))->toBeTrue()
+            ->and($invoice->isImmutableAttribute('total'))->toBeFalse()
+            ->and($invoice->isImmutableAttribute('invoices.total'))->toBeFalse()
+            ->and($invoice->isImmutableAttribute('anything.number'))->toBeTrue()
+            ->and($invoice->isImmutableAttribute('TOTAL'))->toBe(onPostgres());
+    });
+
+    it('leaves out only what parent and child both leave out', function () {
+        expect((new NarrowerCountedInvoice)->getMutableAttributes())->toBe(['note'])
+            ->and((new ClosedCountedInvoice)->getMutableAttributes())->toBe([]);
+
+        $invoice = countedInvoice(NarrowerCountedInvoice::class);
+
+        expect(fn () => $invoice->update(['total' => 2000]))->toThrow(ImmutableAttributeException::class, '[total]');
+        expect(fn () => countedInvoice(ClosedCountedInvoice::class)->update(['note' => 'Checked']))
+            ->toThrow(ImmutableAttributeException::class, '[note]');
+    });
+
+    it('keeps a column guarded that #[Immutable] names', function () {
+        $invoice = countedInvoice(PinnedCountedInvoice::class);
+
+        expect((new PinnedCountedInvoice)->isImmutableAttribute('total'))->toBeTrue()
+            ->and((new PinnedCountedInvoice)->isImmutableAttribute('note'))->toBeFalse();
+        expect(fn () => $invoice->update(['total' => 2000]))->toThrow(ImmutableAttributeException::class, '[total]');
+        expect($invoice->refresh()->update(['note' => 'Checked']))->toBeTrue();
+    });
+
+    it('takes the columns it leaves out from a preset', function () {
+        $entry = PresetLedgerEntry::query()->create(['amount' => 100]);
+
+        expect($entry->getMutableAttributes())->toBe(['memo'])
+            ->and($entry->update(['memo' => 'Checked']))->toBeTrue();
+        expect(fn () => $entry->update(['amount' => 200]))->toThrow(ImmutableAttributeException::class, '[amount]');
+    });
+
+    it('lets a model decide at runtime what it leaves out', function () {
+        ConfiguredInvoice::$frozen = ['*'];
+        ConfiguredInvoice::$loose = ['note'];
+
+        try {
+            $invoice = ConfiguredInvoice::query()->create(['number' => 'INV-001', 'customer_id' => 7, 'issued_at' => now()]);
+
+            expect($invoice->isImmutableAttribute('note'))->toBeFalse()
+                ->and($invoice->isImmutableAttribute('number'))->toBeTrue();
+
+            $invoice->saveQuietly();
+            ConfiguredInvoice::$loose = ['note', 'updated_at'];
+
+            expect($invoice->update(['note' => 'Checked']))->toBeTrue();
+        } finally {
+            ConfiguredInvoice::$frozen = [];
+            ConfiguredInvoice::$loose = [];
+        }
+    });
+
+    it('rejects a getMutableAttributes() override that returns anything but column names', function () {
+        ConfiguredInvoice::$frozen = ['*'];
+        ConfiguredInvoice::$loose = ['note', 123];
+
+        try {
+            expect(fn () => (new ConfiguredInvoice)->isImmutableAttribute('number'))->toThrow(
+                InvalidImmutableColumnsException::class,
+                ConfiguredInvoice::class.'::getMutableAttributes() must return column names as non-empty strings, int given.',
+            );
+        } finally {
+            ConfiguredInvoice::$frozen = [];
+            ConfiguredInvoice::$loose = [];
+        }
+    });
+
+    it('rejects an except that holds the wildcard when the model boots, naming where it is declared', function () {
+        expect(fn () => new MisdeclaredExceptInvoice)->toThrow(
+            InvalidImmutableColumnsException::class,
+            'Drop the attribute to leave the whole model unguarded. Declared on ['.MisdeclaredExceptInvoice::class.'].',
+        );
+    });
+});
+
 describe('resolving the attributes', function () {
     it('reads #[Immutable] from the model', function () {
         expect((new Invoice)->getImmutableAttributes())
@@ -625,7 +834,7 @@ describe('resolving the attributes', function () {
     it('rejects columns on #[ImmutableModel] the same way', function () {
         expect(fn () => new NarrowedLedgerEntry)->toThrow(
             InvalidImmutableColumnsException::class,
-            'Use #[Immutable] to guard single columns. Declared on ['.NarrowedLedgerEntry::class.'].',
+            'or except: [...] to leave some out. Declared on ['.NarrowedLedgerEntry::class.'].',
         );
     });
 

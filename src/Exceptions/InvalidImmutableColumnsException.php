@@ -10,8 +10,9 @@ use InvalidArgumentException;
 /**
  * Thrown when the attributes to guard are misdeclared: #[Immutable] without a
  * column, with "*" or with anything that is not a plain column name,
- * #[ImmutableModel] with columns, or a getImmutableAttributes() override that
- * returns something other than column names.
+ * #[ImmutableModel] with columns or with an except that is not a list of plain
+ * column names, or a getImmutableAttributes() or getMutableAttributes()
+ * override that returns something other than column names.
  *
  * #[Immutable] lists the attributes it guards; #[ImmutableModel] guards the
  * whole model. A declaration is checked when the model boots, so the mistake
@@ -31,7 +32,31 @@ class InvalidImmutableColumnsException extends InvalidArgumentException
 
     public static function modelTakesNoColumns(): self
     {
-        return new self('#[ImmutableModel] takes no columns, it guards the whole model. Use #[Immutable] to guard single columns.');
+        return new self('#[ImmutableModel] takes no columns, it guards the whole model. Use #[Immutable] to guard single columns, or except: [...] to leave some out.');
+    }
+
+    public static function unknownArgument(string $name): self
+    {
+        return new self("#[ImmutableModel] has no argument named \"{$name}\". It takes except: [...] to leave columns out.");
+    }
+
+    public static function exceptInvalid(mixed $value): self
+    {
+        $given = is_string($value) ? 'an empty string' : get_debug_type($value);
+
+        return new self("#[ImmutableModel] takes column names as non-empty strings in except, {$given} given.");
+    }
+
+    public static function exceptWildcard(): self
+    {
+        return new self('#[ImmutableModel] cannot leave out "*". Drop the attribute to leave the whole model unguarded.');
+    }
+
+    public static function exceptJsonPath(string $column): self
+    {
+        $attribute = Str::before($column, '->');
+
+        return new self("#[ImmutableModel] cannot leave out the JSON path \"{$column}\". The guard compares whole columns; leave out '{$attribute}' instead.");
     }
 
     public static function invalid(mixed $value): self
@@ -51,11 +76,11 @@ class InvalidImmutableColumnsException extends InvalidArgumentException
     /**
      * @param  class-string  $model
      */
-    public static function returnedBy(string $model, mixed $value): self
+    public static function returnedBy(string $model, string $method, mixed $value): self
     {
         $given = is_string($value) ? 'an empty string' : get_debug_type($value);
 
-        return new self("{$model}::getImmutableAttributes() must return column names as non-empty strings, {$given} given.");
+        return new self("{$model}::{$method}() must return column names as non-empty strings, {$given} given.");
     }
 
     /**
