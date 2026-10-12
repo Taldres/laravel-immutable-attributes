@@ -1,6 +1,6 @@
 # Release Notes
 
-## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.0.0...HEAD)
+## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.1.0...HEAD)
 
 ### Changed
 
@@ -16,6 +16,28 @@
 ### Documentation
 
 - Documents the limits of deciding at runtime with `getOriginal()`, and that `incrementEach()` and `decrementEach()` before Laravel 13.3 run as a query on the whole table
+
+## [v1.1.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.0.0...v1.1.0) - 2026-10-12
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+### What's Changed
+
+#### Bug Fixes
+
+* Guard the columns an increment writes and match keys as columns by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/5
+
+#### Other Changes
+
+* docs: replace the README banner with the new GitHub banner by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/1
+* docs: use the new banner in the README by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/2
+* build: exclude paratest 7.26.1 until Pest supports it by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/4
+* docs: add the Packagist downloads badge to the README by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/3
+
+### New Contributors
+
+* @Taldres made their first contribution in https://github.com/Taldres/laravel-immutable-attributes/pull/1
+
+**Full Changelog**: https://github.com/Taldres/laravel-immutable-attributes/compare/v1.0.0...v1.1.0
 
 ## [v1.0.0](https://github.com/taldres/laravel-immutable-attributes/releases/tag/v1.0.0) - 2026-10-09
 
