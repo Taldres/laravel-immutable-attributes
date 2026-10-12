@@ -2,6 +2,8 @@
 
 ## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.1.0...HEAD)
 
+## [v1.1.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.0.0...v1.1.0) - 2026-10-12
+
 ### Changed
 
 - `#[Immutable]` rejects empty names, non-strings, nested lists and JSON paths such as `options->currency`: a model declared that way now fails when it boots with `InvalidImmutableColumnsException` instead of guarding nothing for them. A value of the wrong type, such as `null` or an integer, raises the same exception instead of a `TypeError`
@@ -16,8 +18,6 @@
 ### Documentation
 
 - Documents the limits of deciding at runtime with `getOriginal()`, and that `incrementEach()` and `decrementEach()` before Laravel 13.3 run as a query on the whole table
-
-## [v1.1.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.0.0...v1.1.0) - 2026-10-12
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 ### What's Changed
