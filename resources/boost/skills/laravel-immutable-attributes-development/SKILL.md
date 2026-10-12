@@ -91,7 +91,7 @@ class Invoice extends Model
 - do not add an `updating` listener that re-implements the check
 - do not catch `ImmutableAttributeException` to retry the same save
 - do not route normal application writes through the query builder to get around the guard
-- do not rely on the guard for `incrementQuietly()`, `decrementQuietly()`, increments inside `Model::withoutEvents()`, mass updates, `$touches` or deletes; it does not cover them
+- do not rely on the guard for `incrementQuietly()`, `decrementQuietly()`, increments inside `Model::withoutEvents()`, mass updates, `$touches`, deletes or an `increment()` on a model that does not exist yet, which Laravel runs as a query on the whole table; it does not cover them
 - do not call `incrementEach()` or `decrementEach()` on a model before Laravel 13.3; Laravel runs them as an unguarded query on the whole table
 - do not override `getDirtyForUpdate()` on a guarded model without aliasing the trait method and calling it; `parent::getDirtyForUpdate()` skips the guard
 - the same applies to `incrementOrDecrement()` and, on Laravel 13.3 and later, `incrementOrDecrementEach()`: the trait overrides them to check the columns an increment writes, so keep their `int|false` return type
