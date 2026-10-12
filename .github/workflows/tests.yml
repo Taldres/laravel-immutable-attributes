@@ -61,6 +61,8 @@ jobs:
       # Only where Pest 5 resolves: the type coverage plugin before 5.0.1
       # writes its cache from parallel workers and corrupts it at random. The
       # result does not depend on the lane anyway.
+      # @todo pest-plugin-type-coverage 5.0.1: Revisit the Pest 5 lane condition
+      # once composer.json requires ^5.0.1.
       - name: Type Coverage
         if: runner.os != 'Windows' && matrix.laravel == '13.*' && matrix.stability == 'prefer-stable'
         run: composer test:types

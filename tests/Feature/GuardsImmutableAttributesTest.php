@@ -10,6 +10,8 @@ use Taldres\ImmutableAttributes\Attributes\ImmutableModel;
 use Taldres\ImmutableAttributes\Concerns\GuardsImmutableAttributes;
 use Taldres\ImmutableAttributes\Exceptions\ImmutableAttributeException;
 use Taldres\ImmutableAttributes\Exceptions\InvalidImmutableColumnsException;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Casts\AsCents;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Casts\Cents;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Concerns\HasEmptyImmutableList;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\AuditEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\ConfiguredInvoice;
@@ -18,6 +20,9 @@ use Taldres\ImmutableAttributes\Tests\Fixtures\Models\Invoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\LedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\LockedInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\MisdeclaredLedgerEntry;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\NormalizedInvoice;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\PostgresInvoice;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\RestampedInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\SoftDeletingLedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\TouchingLedgerEntry;
 
@@ -172,6 +177,28 @@ describe('updating', function () {
             ->and($invoice->save())->toBeTrue();
     });
 
+    it('writes nothing of a save that changes an immutable attribute', function () {
+        $invoice = invoice();
+
+        expect(fn () => $invoice->update(['number' => 'INV-999', 'total' => 2000]))->toThrow(ImmutableAttributeException::class);
+        expect(DB::table('invoices')->value('total'))->toBe(1000);
+    });
+
+    it('asks isImmutableAttribute() about every written key', function () {
+        $model = new class extends Invoice
+        {
+            public function isImmutableAttribute(string $key): bool
+            {
+                return $key === 'note';
+            }
+        };
+
+        $invoice = $model->newQuery()->findOrFail(invoice()->id);
+
+        expect(fn () => $invoice->update(['note' => 'Changed']))->toThrow(ImmutableAttributeException::class, '[note]')
+            ->and($invoice->refresh()->update(['number' => 'INV-002']))->toBeTrue();
+    });
+
     it('names every changed immutable attribute', function () {
         $invoice = invoice();
 
@@ -188,12 +215,103 @@ describe('updating', function () {
     });
 });
 
+describe('column name aliases', function () {
+    it('treats case, a qualifier and a JSON path as the column they write', function (Closure $change) {
+        $invoice = invoice();
+
+        expect(fn () => $change($invoice))->toThrow(ImmutableAttributeException::class);
+        expect(storedNumber($invoice))->toBe('INV-001')
+            ->and(DB::table('invoices')->value('options'))->toBe('{"currency":"EUR"}');
+    })->with([
+        'upper case on save' => fn (Invoice $invoice) => $invoice->forceFill(['NUMBER' => 'INV-999'])->save(),
+        'table prefix on save' => fn (Invoice $invoice) => $invoice->forceFill(['invoices.number' => 'INV-999'])->save(),
+        'any qualifier on save' => fn (Invoice $invoice) => $invoice->forceFill(['anything.number' => 'INV-999'])->save(),
+        'upper case in increment extras' => fn (Invoice $invoice) => $invoice->increment('total', 1, ['NUMBER' => 'INV-999']),
+        'JSON path in increment extras' => fn (Invoice $invoice) => $invoice->increment('total', 1, ['options->currency' => 'USD']),
+        'table prefix in increment extras' => fn (Invoice $invoice) => $invoice->increment('total', 1, ['invoices.number' => 'INV-999']),
+        'any qualifier in increment extras' => fn (Invoice $invoice) => $invoice->increment('total', 1, ['anything.number' => 'INV-999']),
+    ]);
+
+    it('names each declared attribute once', function (Closure $change, array $attributes) {
+        $invoice = invoice();
+
+        expect(fn () => $change($invoice))
+            ->toThrow(fn (ImmutableAttributeException $e) => expect($e->attributes)->toBe($attributes));
+    })->with([
+        'upper case' => [fn (Invoice $invoice) => $invoice->forceFill(['NUMBER' => 'INV-999'])->save(), ['number']],
+        'a JSON path and its column' => [fn (Invoice $invoice) => $invoice->increment('total', 1, ['options->currency' => 'USD']), ['options']],
+    ]);
+
+    it('reports the column a key writes as immutable', function () {
+        $invoice = new Invoice;
+
+        expect($invoice->isImmutableAttribute('NUMBER'))->toBeTrue()
+            ->and($invoice->isImmutableAttribute('public.invoices.number'))->toBeTrue()
+            ->and($invoice->isImmutableAttribute('options->currency'))->toBeTrue()
+            ->and($invoice->isImmutableAttribute('invoices.total'))->toBeFalse();
+    });
+
+    it('keeps the case of column names on PostgreSQL', function () {
+        $invoice = new PostgresInvoice;
+
+        expect($invoice->isImmutableAttribute('number'))->toBeTrue()
+            ->and($invoice->isImmutableAttribute('anything.number'))->toBeTrue()
+            ->and($invoice->isImmutableAttribute('options->currency'))->toBeTrue()
+            ->and($invoice->isImmutableAttribute('NUMBER'))->toBeFalse()
+            ->and($invoice->isImmutableAttribute('invoices.NUMBER'))->toBeFalse();
+    });
+
+    it('decides without a database connection unless only the case differs', function () {
+        $resolver = Model::getConnectionResolver();
+        Model::unsetConnectionResolver();
+
+        try {
+            $invoice = new Invoice;
+
+            expect($invoice->isImmutableAttribute('number'))->toBeTrue()
+                ->and($invoice->isImmutableAttribute('invoices.number'))->toBeTrue()
+                ->and($invoice->isImmutableAttribute('total'))->toBeFalse();
+        } finally {
+            Model::setConnectionResolver($resolver);
+        }
+    });
+
+    it('names the written columns when the whole model is guarded', function () {
+        $invoice = LockedInvoice::query()->create(['number' => 'INV-001', 'customer_id' => 7, 'issued_at' => now(), 'total' => 1000]);
+
+        expect(fn () => $invoice->increment('total', 1, ['invoices.note' => 'Changed', 'options->currency' => 'USD']))
+            ->toThrow(fn (ImmutableAttributeException $e) => expect($e->attributes)->toBe(['total', 'note', 'options', 'updated_at']));
+    });
+});
+
 describe('incrementing', function () {
+    it('leaves an increment by zero alone', function () {
+        $invoice = invoice();
+
+        $invoice->increment('customer_id', 0);
+
+        expect(DB::table('invoices')->value('customer_id'))->toBe(7);
+    });
+
+    it('still throws on an increment by zero with an immutable extra attribute', function () {
+        $invoice = invoice();
+
+        expect(fn () => $invoice->increment('customer_id', 0, ['number' => 'INV-001']))
+            ->toThrow(ImmutableAttributeException::class);
+    });
+
     it('throws on increment() of an immutable attribute', function () {
         $invoice = invoice();
 
         expect(fn () => $invoice->increment('customer_id'))->toThrow(ImmutableAttributeException::class);
         expect(DB::table('invoices')->value('customer_id'))->toBe(7);
+    });
+
+    it('names an attribute once when it is dirty and written by the increment', function () {
+        $invoice = invoice();
+
+        expect(fn () => $invoice->increment('total', 1, ['number' => 'INV-999']))
+            ->toThrow(fn (ImmutableAttributeException $e) => expect($e->attributes)->toBe(['number']));
     });
 
     it('throws on decrement() with extra immutable attributes', function () {
@@ -203,6 +321,128 @@ describe('incrementing', function () {
             ->toThrow(ImmutableAttributeException::class);
     });
 
+    it('throws when an immutable extra attribute keeps its current value', function () {
+        $invoice = invoice();
+
+        expect(fn () => $invoice->increment('total', 1, ['number' => 'INV-001']))
+            ->toThrow(ImmutableAttributeException::class);
+    });
+
+    it('throws when a setter hides a change to an extra attribute', function () {
+        $invoice = NormalizedInvoice::query()->create(['number' => 'INV-001', 'customer_id' => 7, 'issued_at' => now()]);
+
+        expect(fn () => $invoice->increment('total', 1, ['number' => ' inv-001 ']))
+            ->toThrow(ImmutableAttributeException::class);
+        expect(DB::table('invoices')->value('number'))->toBe('INV-001');
+    });
+
+    it('throws when a cast hides a change to the incremented attribute', function () {
+        $invoice = NormalizedInvoice::query()->create(['number' => 'INV-001', 'customer_id' => 7, 'issued_at' => now(), 'paid' => true]);
+
+        expect(fn () => $invoice->increment('paid'))->toThrow(ImmutableAttributeException::class);
+        expect(DB::table('invoices')->value('paid'))->toBe(1);
+    });
+
+    it('takes a numeric string as the amount, as Laravel does', function () {
+        $invoice = invoice();
+
+        $invoice->increment('total', '5');
+
+        expect(DB::table('invoices')->value('total'))->toBe(1005);
+        expect(fn () => $invoice->increment('customer_id', '1'))->toThrow(ImmutableAttributeException::class);
+    });
+
+    it('takes a value object as the amount of a cast that increments it', function () {
+        $invoice = invoice();
+        $invoice->mergeCasts(['total' => AsCents::class, 'customer_id' => AsCents::class]);
+
+        $invoice->increment('total', new Cents(5));
+
+        expect(DB::table('invoices')->value('total'))->toBe(1005);
+        expect(fn () => $invoice->increment('customer_id', new Cents(1)))->toThrow(ImmutableAttributeException::class);
+        expect(DB::table('invoices')->value('customer_id'))->toBe(7);
+    });
+
+    it('counts the update timestamp an increment writes', function () {
+        $invoice = LockedInvoice::query()->create(['number' => 'INV-001', 'customer_id' => 7, 'issued_at' => now(), 'total' => 1000]);
+        $updatedAt = DB::table('invoices')->value('updated_at');
+
+        $this->travel(5)->minutes();
+
+        expect(fn () => $invoice->increment('total', 0))
+            ->toThrow(fn (ImmutableAttributeException $e) => expect($e->attributes)->toBe(['updated_at']));
+        expect(DB::table('invoices')->value('updated_at'))->toBe($updatedAt);
+    });
+
+    it('throws on an increment when the update timestamp is immutable', function () {
+        ConfiguredInvoice::$frozen = ['updated_at'];
+
+        $invoice = ConfiguredInvoice::query()->create(['number' => 'INV-001', 'customer_id' => 7, 'issued_at' => now()]);
+
+        expect(fn () => $invoice->increment('total'))->toThrow(ImmutableAttributeException::class, '[updated_at]');
+        expect(DB::table('invoices')->value('total'))->toBe(0);
+    });
+
+    it('follows the update timestamp to its configured column', function () {
+        RestampedInvoice::$updatedAtColumn = 'note';
+        RestampedInvoice::$frozen = ['updated_at'];
+
+        $invoice = RestampedInvoice::query()->create(['number' => 'INV-001', 'customer_id' => 7, 'issued_at' => now(), 'total' => 1000]);
+        $invoice->increment('total');
+
+        RestampedInvoice::$frozen = ['note'];
+
+        expect(fn () => $invoice->increment('total'))->toThrow(ImmutableAttributeException::class, '[note]');
+        expect(DB::table('invoices')->value('total'))->toBe(1001);
+    });
+
+    it('leaves an increment alone when the model has no update timestamp', function () {
+        RestampedInvoice::$updatedAtColumn = null;
+        RestampedInvoice::$frozen = ['updated_at'];
+
+        $invoice = RestampedInvoice::query()->create(['number' => 'INV-001', 'customer_id' => 7, 'issued_at' => now(), 'total' => 1000]);
+        $invoice->increment('total');
+
+        expect(DB::table('invoices')->value('total'))->toBe(1001);
+    });
+
+    it('leaves an increment by zero without timestamps alone', function () {
+        $invoice = LockedInvoice::query()->create(['number' => 'INV-001', 'customer_id' => 7, 'issued_at' => now(), 'total' => 1000]);
+
+        expect(LockedInvoice::withoutTimestamps(fn () => $invoice->increment('total', 0)))->toBe(1);
+    });
+
+    it('forgets the columns of an increment that threw', function () {
+        $invoice = invoice();
+
+        expect(fn () => $invoice->increment('total', 1, ['number' => 'INV-001']))->toThrow(ImmutableAttributeException::class);
+
+        $invoice->refresh()->update(['note' => 'Checked']);
+
+        expect(DB::table('invoices')->value('note'))->toBe('Checked');
+    });
+
+    // @todo Laravel 13.3: Drop the skip once composer.json requires ^13.3.
+    it('leaves incrementEach() by zero alone and throws on a non-zero immutable column', function () {
+        $invoice = invoice();
+
+        $invoice->incrementEach(['customer_id' => 0, 'total' => 5]);
+
+        expect(DB::table('invoices')->value('customer_id'))->toBe(7)
+            ->and(DB::table('invoices')->value('total'))->toBe(1005);
+        expect(fn () => $invoice->incrementEach(['customer_id' => 1, 'total' => 0]))
+            ->toThrow(ImmutableAttributeException::class);
+    })->skip(! method_exists(Model::class, 'incrementEach'), 'Model::incrementEach() arrived in Laravel 13.3.');
+
+    // @todo Laravel 13.3: Drop the skip once composer.json requires ^13.3.
+    it('throws on incrementEach() when a setter hides a change to an extra attribute', function () {
+        $invoice = NormalizedInvoice::query()->create(['number' => 'INV-001', 'customer_id' => 7, 'issued_at' => now()]);
+
+        expect(fn () => $invoice->incrementEach(['total' => 1], ['number' => ' inv-001 ']))
+            ->toThrow(ImmutableAttributeException::class);
+        expect(DB::table('invoices')->value('number'))->toBe('INV-001');
+    })->skip(! method_exists(Model::class, 'incrementEach'), 'Model::incrementEach() arrived in Laravel 13.3.');
+
     it('increments mutable attributes', function () {
         $invoice = invoice();
 
@@ -211,6 +451,7 @@ describe('incrementing', function () {
         expect($invoice->fresh()?->total)->toBe(1050);
     });
 
+    // @todo Laravel 13.3: Drop the skip once composer.json requires ^13.3.
     it('throws on incrementEach() and decrementEach()', function (Closure $change) {
         $invoice = invoice();
 
@@ -427,6 +668,7 @@ describe('outside the model', function () {
         expect(DB::table('invoices')->value('customer_id'))->toBe(8);
     });
 
+    // @todo Laravel 13.20: Drop the skip once composer.json requires ^13.20.
     it('leaves incrementEachQuietly() and decrementEachQuietly() alone', function () {
         $invoice = invoice();
 
@@ -435,6 +677,16 @@ describe('outside the model', function () {
 
         expect(DB::table('invoices')->value('customer_id'))->toBe(8);
     })->skip(! method_exists(Model::class, 'incrementEachQuietly'), 'Model::incrementEachQuietly() arrived in Laravel 13.20.');
+
+    // @todo Laravel 13.3: Remove with its README row once composer.json requires ^13.3.
+    it('leaves incrementEach() before Laravel 13.3 alone, which updates every row', function () {
+        $invoice = invoice();
+        invoice(['number' => 'INV-002', 'customer_id' => 8]);
+
+        $invoice->incrementEach(['customer_id' => 1]);
+
+        expect(DB::table('invoices')->orderBy('id')->pluck('customer_id')->all())->toBe([8, 9]);
+    })->skip(method_exists(Model::class, 'incrementEach'), 'Model::incrementEach() updates only its own row since Laravel 13.3.');
 
     it('leaves parent timestamps touched through $touches alone', function () {
         $invoice = LockedInvoice::query()->create([
