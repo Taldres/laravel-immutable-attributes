@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Taldres\ImmutableAttributes\Attributes;
 
 use Attribute;
+use Illuminate\Support\Arr;
 use Taldres\ImmutableAttributes\Exceptions\InvalidImmutableColumnsException;
 
 /**
@@ -45,15 +46,14 @@ class Immutable
     {
         $flattened = [];
 
-        foreach ($columns as $column) {
-            // Not Arr::wrap(): it turns null into an empty list and drops it.
-            foreach (is_array($column) ? $column : [$column] as $name) {
-                if (! is_string($name) || blank($name)) {
-                    throw InvalidImmutableColumnsException::invalid($name);
-                }
-
-                $flattened[] = $name;
+        // One level only: a list inside a list is not a column name. Arr::wrap()
+        // would not do, it turns null into an empty list and drops it.
+        foreach (Arr::flatten($columns, 1) as $name) {
+            if (! is_string($name) || trim($name) === '') {
+                throw InvalidImmutableColumnsException::invalid($name);
             }
+
+            $flattened[] = $name;
         }
 
         if ($flattened === []) {

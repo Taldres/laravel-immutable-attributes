@@ -23,6 +23,11 @@ class ConfiguredInvoice extends Model
      */
     public static array $frozen = [];
 
+    /**
+     * @var list<string>
+     */
+    public static array $loose = [];
+
     protected $table = 'invoices';
 
     protected $guarded = [];
@@ -33,5 +38,13 @@ class ConfiguredInvoice extends Model
     public function getImmutableAttributes(): array
     {
         return static::$frozen;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getMutableAttributes(): array
+    {
+        return static::$loose;
     }
 }

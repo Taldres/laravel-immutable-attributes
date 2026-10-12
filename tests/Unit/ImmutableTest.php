@@ -55,12 +55,59 @@ it('does not take JSON paths', function () {
 it('takes no columns as #[ImmutableModel]', function (Closure $make) {
     expect($make)->toThrow(
         InvalidImmutableColumnsException::class,
-        '#[ImmutableModel] takes no columns, it guards the whole model. Use #[Immutable] to guard single columns.',
+        '#[ImmutableModel] takes no columns, it guards the whole model. Use #[Immutable] to guard single columns, or except: [...] to leave some out.',
     );
 })->with([
     'a column' => fn () => new ImmutableModel('number'),
     'a list' => fn () => new ImmutableModel(['number']),
+    'a column next to except' => fn () => new ImmutableModel('number', except: ['total']),
 ]);
+
+it('leaves columns out with except', function (Closure $make, array $except) {
+    expect($make()->except)->toBe($except);
+})->with([
+    'nothing by default' => [fn () => new ImmutableModel, []],
+    'a list' => [fn () => new ImmutableModel(except: ['total', 'note']), ['total', 'note']],
+    'one name' => [fn () => new ImmutableModel(except: 'total'), ['total']],
+    'duplicates once' => [fn () => new ImmutableModel(except: ['total', 'total']), ['total']],
+]);
+
+it('still guards the whole model when it leaves columns out', function () {
+    expect((new ImmutableModel(except: ['total']))->columns)->toBe(['*']);
+});
+
+it('knows no argument but except', function () {
+    expect(fn () => new ImmutableModel(excpet: ['total']))->toThrow(
+        InvalidImmutableColumnsException::class,
+        '#[ImmutableModel] has no argument named "excpet". It takes except: [...] to leave columns out.',
+    );
+});
+
+it('takes column names as non-empty strings in except', function (Closure $make, string $given) {
+    expect($make)->toThrow(
+        InvalidImmutableColumnsException::class,
+        "#[ImmutableModel] takes column names as non-empty strings in except, {$given} given.",
+    );
+})->with([
+    'an empty string' => [fn () => new ImmutableModel(except: ['total', '']), 'an empty string'],
+    'an integer' => [fn () => new ImmutableModel(except: [123]), 'int'],
+    'null' => [fn () => new ImmutableModel(except: null), 'null'],
+    'a nested list' => [fn () => new ImmutableModel(except: [['total']]), 'array'],
+]);
+
+it('cannot leave out the wildcard', function () {
+    expect(fn () => new ImmutableModel(except: ['*']))->toThrow(
+        InvalidImmutableColumnsException::class,
+        '#[ImmutableModel] cannot leave out "*". Drop the attribute to leave the whole model unguarded.',
+    );
+});
+
+it('cannot leave out a JSON path', function () {
+    expect(fn () => new ImmutableModel(except: ['options->currency']))->toThrow(
+        InvalidImmutableColumnsException::class,
+        'cannot leave out the JSON path "options->currency". The guard compares whole columns; leave out \'options\' instead.',
+    );
+});
 
 it('covers the whole model as #[ImmutableModel]', function () {
     expect((new ImmutableModel)->columns)->toBe(['*']);
