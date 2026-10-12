@@ -43,8 +43,8 @@ jobs:
         include:
           - version: '5.7'
             php: 8.3
-            laravel: 12.*
-            testbench: 10.*
+            laravel: 13.*
+            testbench: 11.*
             stability: prefer-lowest
           - version: '9.7'
             php: 8.5
@@ -102,8 +102,8 @@ jobs:
         include:
           - version: '10.11'
             php: 8.3
-            laravel: 12.*
-            testbench: 10.*
+            laravel: 13.*
+            testbench: 11.*
             stability: prefer-lowest
           - version: '12.3'
             php: 8.5
@@ -162,8 +162,8 @@ jobs:
         include:
           - version: '10'
             php: 8.3
-            laravel: 12.*
-            testbench: 10.*
+            laravel: 13.*
+            testbench: 11.*
             stability: prefer-lowest
           - version: '18'
             php: 8.5
