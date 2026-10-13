@@ -241,14 +241,15 @@ type, `int|false`. A rejected increment leaves the model as it was.
 A key counts as the column it writes, whatever its qualifier: `invoices.number`
 counts as `number`, and `options->currency` counts as `options`. Case does not
 count either, so `NUMBER` is `number`, except on PostgreSQL, where Laravel quotes
-identifiers and `NUMBER` is a different column. Entries returned by
+identifiers and `NUMBER` is a different column. SQLite folds ASCII case only, so
+there `CAFÉ` and `café` are two columns. Entries returned by
 `getImmutableAttributes()` are matched the same way, so `'options->currency'`
 there guards the whole `options` column. The exception names the attribute as
 declared.
 
-An increment by `0` leaves its column alone but still writes the update
-timestamp of a model with timestamps, so under `#[ImmutableModel]` it throws
-unless it runs inside `Model::withoutTimestamps()`.
+An increment by `0` of an immutable column throws as well. Its query still
+writes the column, and the database turns the value into a number, so `001` in
+a text column becomes `1`.
 
 ## AI agents
 
