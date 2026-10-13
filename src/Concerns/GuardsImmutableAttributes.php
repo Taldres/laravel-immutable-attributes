@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Taldres\ImmutableAttributes\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use ReflectionAttribute;
 use ReflectionClass;
@@ -111,9 +112,9 @@ trait GuardsImmutableAttributes
     }
 
     /**
-     * An amount of zero leaves its column alone, while an amount that is not a
-     * number, such as a value object for a cast, counts as a change. The Eloquent
-     * builder adds the update timestamp to every increment it runs.
+     * An amount of zero still writes its column: the database casts the stored
+     * value to a number, so "001" in a text column comes back as "1". The
+     * Eloquent builder adds the update timestamp to every increment it runs.
      *
      * @param  array<array-key, mixed>  $amounts
      * @param  array<array-key, mixed>  $extra
@@ -123,13 +124,7 @@ trait GuardsImmutableAttributes
     {
         $columns = [];
 
-        foreach ($amounts as $column => $amount) {
-            if (! is_numeric($amount) || (float) $amount !== 0.0) {
-                $columns[] = (string) $column;
-            }
-        }
-
-        foreach (array_keys($extra) as $column) {
+        foreach ([...array_keys($amounts), ...array_keys($extra)] as $column) {
             $columns[] = (string) $column;
         }
 
@@ -182,6 +177,10 @@ trait GuardsImmutableAttributes
      * when "*" guards the model and the column is not left out. A key counts as
      * the column it writes: "options->currency" writes "options", and the SQLite
      * and PostgreSQL grammars drop any qualifier, as in "invoices.number".
+     *
+     * Databases disagree on whether "NUMBER" and "number" are one column, so
+     * the guard errs towards throwing: an immutable attribute matches in any
+     * case, while a column left out must be named exactly.
      */
     private function immutableAttributeWrittenBy(string $key): ?string
     {
@@ -190,7 +189,10 @@ trait GuardsImmutableAttributes
 
         array_walk($immutable, fn (mixed $attribute) => $this->assertColumnName($attribute, 'getImmutableAttributes'));
 
-        if (($declared = $this->listedColumn($immutable, $column)) !== null) {
+        $folded = mb_strtolower($column, 'UTF-8');
+        $declared = Arr::first($immutable, fn (string $listed): bool => mb_strtolower(self::columnWrittenBy($listed), 'UTF-8') === $folded);
+
+        if ($declared !== null) {
             return $declared;
         }
 
@@ -202,39 +204,9 @@ trait GuardsImmutableAttributes
 
         array_walk($mutable, fn (mixed $attribute) => $this->assertColumnName($attribute, 'getMutableAttributes'));
 
-        return $this->listedColumn($mutable, $column) === null ? $column : null;
-    }
+        $leftOut = Arr::first($mutable, fn (string $listed): bool => self::columnWrittenBy($listed) === $column);
 
-    /**
-     * The entry of the list that names the column, as listed. Case counts only
-     * on PostgreSQL, where Laravel quotes identifiers and "NUMBER" is a
-     * different column, so the connection is asked only when nothing but case
-     * differs. Case is folded for the whole of Unicode: MySQL and MariaDB do so
-     * for "CAFÉ" and "café", while they keep "cafe" apart.
-     *
-     * @param  list<string>  $columns
-     */
-    private function listedColumn(array $columns, string $column): ?string
-    {
-        $differentCase = null;
-
-        foreach ($columns as $listed) {
-            $name = self::columnWrittenBy($listed);
-
-            if ($name === $column) {
-                return $listed;
-            }
-
-            if (mb_strtolower($name, 'UTF-8') === mb_strtolower($column, 'UTF-8')) {
-                $differentCase ??= $listed;
-            }
-        }
-
-        if ($differentCase !== null && $this->getConnection()->getDriverName() !== 'pgsql') {
-            return $differentCase;
-        }
-
-        return null;
+        return $leftOut === null ? $column : null;
     }
 
     /**

@@ -45,8 +45,8 @@ class Invoice extends Model
 ```
 
 - `#[ImmutableModel]` guards every attribute: the row is never updated again,
-  not even by `touch()`, `restore()` or an increment by `0` on a model with
-  timestamps, which still writes `updated_at`; deleting stays possible
+  not even by `touch()`, `restore()` or an increment by `0`, which still
+  writes its column; deleting stays possible
 - `#[Immutable]` needs at least one column and rejects `'*'`; a model declared
   that way fails when it boots with `InvalidImmutableColumnsException`, so use
   `#[ImmutableModel]` for the whole model; `#[ImmutableModel]` takes no columns
@@ -95,4 +95,4 @@ class Invoice extends Model
 - do not rely on the guard for mass updates, `$touches`, deletes or an `increment()` on a model that does not exist yet, which Laravel runs as a query on the whole table; it does not cover them
 - do not override `getDirtyForUpdate()` on a guarded model without aliasing the trait method and calling it; `parent::getDirtyForUpdate()` skips the guard
 - the same applies to `incrementOrDecrement()` and `incrementOrDecrementEach()`: the trait overrides them to check the columns an increment writes, even without events, so keep their `int|false` return type
-- a key counts as the column it writes, whatever its qualifier or case (`invoices.number` and `NUMBER` count as `number`, `options->currency` as `options`); case counts only on PostgreSQL, where `NUMBER` is a different column; `#[Immutable]` itself rejects JSON paths, so declare the whole column
+- a key counts as the column it writes, whatever its qualifier (`invoices.number` counts as `number`, `options->currency` as `options`); an immutable attribute matches in any case on every database (`NUMBER` counts as `number`), while a column left out with `except` only under its exact name, so write it with the case it is declared in; `#[Immutable]` itself rejects JSON paths, so declare the whole column

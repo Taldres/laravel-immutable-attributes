@@ -242,16 +242,21 @@ needs the same aliasing and the trait's return type, `int|false`. A rejected
 increment leaves the model as it was.
 
 A key counts as the column it writes, whatever its qualifier: `invoices.number`
-counts as `number`, and `options->currency` counts as `options`. Case does not
-count either, so `NUMBER` is `number`, except on PostgreSQL, where Laravel quotes
-identifiers and `NUMBER` is a different column. Entries returned by
-`getImmutableAttributes()` are matched the same way, so `'options->currency'`
-there guards the whole `options` column. The exception names the attribute as
-declared.
+counts as `number`, and `options->currency` counts as `options`. Entries
+returned by `getImmutableAttributes()` are matched the same way, so
+`'options->currency'` there guards the whole `options` column. The exception
+names the attribute as declared.
 
-An increment by `0` leaves its column alone but still writes the update
-timestamp of a model with timestamps, so under `#[ImmutableModel]` it throws
-unless it runs inside `Model::withoutTimestamps()`.
+Databases disagree on whether `NUMBER` and `number` are the same column, so the
+guard leans towards throwing. An immutable attribute matches in any case:
+`NUMBER` counts as `number` on every database. A column left out with `except`
+or `getMutableAttributes()` only counts under its exact name, so with
+`except: ['views']` a write to `VIEWS` throws. Name it in the case your code
+writes it.
+
+An increment by `0` of an immutable column throws as well. Its query still
+writes the column, and the database turns the value into a number, so `001` in
+a text column becomes `1`.
 
 ## AI agents
 
