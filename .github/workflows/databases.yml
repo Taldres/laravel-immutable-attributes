@@ -1,7 +1,7 @@
 name: databases
 
 # The guard decides from a key which column the database will change, and the
-# drivers differ: PostgreSQL tells "NUMBER" from "number", MySQL does not. The
+# drivers differ in how they read a qualifier such as "invoices.number". The
 # tests run on SQLite elsewhere; here they run on the servers Laravel supports,
 # with the oldest and the newest version of each.
 
