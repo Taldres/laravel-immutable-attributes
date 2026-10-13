@@ -71,7 +71,7 @@ describe('how the database reads a column name', function () {
         expect(storedInvoiceNumber($id))->toBe(in_array(DB::connection()->getDriverName(), ['sqlite', 'pgsql'], true) ? 'INV-999' : 'INV-001');
     });
 
-    it('folds case beyond ASCII in MySQL and MariaDB, but not accents', function () {
+    it('folds case beyond ASCII in MySQL and MariaDB only, and never accents', function () {
         Schema::create('accented_rows', function (Blueprint $table): void {
             $table->id();
             $table->string('café')->nullable();
@@ -93,7 +93,7 @@ describe('how the database reads a column name', function () {
         } finally {
             Schema::dropIfExists('accented_rows');
         }
-    })->skip(fn () => DB::connection()->getDriverName() === 'sqlite', 'SQLite folds ASCII only, which the test above covers.');
+    });
 
     it('writes a JSON path into its column', function () {
         $id = insertInvoiceRow();

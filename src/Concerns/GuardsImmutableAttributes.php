@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Taldres\ImmutableAttributes\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use ReflectionAttribute;
 use ReflectionClass;
@@ -111,9 +112,9 @@ trait GuardsImmutableAttributes
     }
 
     /**
-     * An amount of zero leaves its column alone, while an amount that is not a
-     * number, such as a value object for a cast, counts as a change. The Eloquent
-     * builder adds the update timestamp to every increment it runs.
+     * An amount of zero still writes its column: the database casts the stored
+     * value to a number, so "001" in a text column comes back as "1". The
+     * Eloquent builder adds the update timestamp to every increment it runs.
      *
      * @param  array<array-key, mixed>  $amounts
      * @param  array<array-key, mixed>  $extra
@@ -123,13 +124,7 @@ trait GuardsImmutableAttributes
     {
         $columns = [];
 
-        foreach ($amounts as $column => $amount) {
-            if (! is_numeric($amount) || (float) $amount !== 0.0) {
-                $columns[] = (string) $column;
-            }
-        }
-
-        foreach (array_keys($extra) as $column) {
+        foreach ([...array_keys($amounts), ...array_keys($extra)] as $column) {
             $columns[] = (string) $column;
         }
 
@@ -206,17 +201,18 @@ trait GuardsImmutableAttributes
     }
 
     /**
-     * The entry of the list that names the column, as listed. Case counts only
-     * on PostgreSQL, where Laravel quotes identifiers and "NUMBER" is a
-     * different column, so the connection is asked only when nothing but case
-     * differs. Case is folded for the whole of Unicode: MySQL and MariaDB do so
-     * for "CAFÉ" and "café", while they keep "cafe" apart.
+     * The entry of the list that names the column, as listed. Case counts on
+     * PostgreSQL, where Laravel quotes identifiers and "NUMBER" is a different
+     * column, so the connection is asked only when nothing but case differs.
+     * SQLite folds ASCII only, so "CAFÉ" and "café" are two columns there.
+     * Elsewhere case is folded for the whole of Unicode: MySQL and MariaDB do
+     * so for "CAFÉ" and "café", while they keep "cafe" apart.
      *
      * @param  list<string>  $columns
      */
     private function listedColumn(array $columns, string $column): ?string
     {
-        $differentCase = null;
+        $differentCase = [];
 
         foreach ($columns as $listed) {
             $name = self::columnWrittenBy($listed);
@@ -226,15 +222,19 @@ trait GuardsImmutableAttributes
             }
 
             if (mb_strtolower($name, 'UTF-8') === mb_strtolower($column, 'UTF-8')) {
-                $differentCase ??= $listed;
+                $differentCase[] = $listed;
             }
         }
 
-        if ($differentCase !== null && $this->getConnection()->getDriverName() !== 'pgsql') {
-            return $differentCase;
+        if ($differentCase === []) {
+            return null;
         }
 
-        return null;
+        return match ($this->getConnection()->getDriverName()) {
+            'pgsql' => null,
+            'sqlite' => Arr::first($differentCase, fn (string $listed): bool => strtolower(self::columnWrittenBy($listed)) === strtolower($column)),
+            default => $differentCase[0],
+        };
     }
 
     /**
