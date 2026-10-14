@@ -39,10 +39,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Taldres\\ImmutableAttributes\\Tests\\": "tests/",
-            "Workbench\\App\\": "workbench/app/",
-            "Workbench\\Database\\Factories\\": "workbench/database/factories/",
-            "Workbench\\Database\\Seeders\\": "workbench/database/seeders/"
+            "Taldres\\ImmutableAttributes\\Tests\\": "tests/"
         }
     },
     "scripts": {
@@ -52,14 +49,6 @@
         ],
         "prepare": [
             "@php vendor/bin/testbench package:discover --ansi"
-        ],
-        "build": [
-            "@php vendor/bin/testbench workbench:build --ansi"
-        ],
-        "serve": [
-            "Composer\\Config::disableProcessTimeout",
-            "@build",
-            "@php vendor/bin/testbench serve --ansi"
         ],
         "lint": [
             "vendor/bin/pint --parallel"

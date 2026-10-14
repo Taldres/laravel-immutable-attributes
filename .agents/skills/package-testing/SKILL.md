@@ -33,7 +33,7 @@ Prove package behavior with Pest 4/5, Orchestra Testbench, and the local `tests/
 
 - Test config merge and config override by asserting default package config, then overriding the host config value in the Testbench app.
 - Test publishable assets, migrations, views, lang files, or config by invoking vendor publish behavior and asserting the target path exists.
-- Test routes with Testbench HTTP requests, commands with Artisan assertions, migrations with a SQLite test database, and workbench behavior after `composer build` when needed.
+- Test routes with Testbench HTTP requests, commands with Artisan assertions, and migrations with a SQLite test database.
 
 ## Anti-Patterns
 
