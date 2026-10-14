@@ -956,6 +956,7 @@ describe('resolving the attributes', function () {
         'an integer' => [[123], 'int'],
         'a nested list' => [[['number']], 'array'],
         'an empty string' => [[''], 'an empty string'],
+        'only a zero-width space' => [["\u{200B}"], 'an empty string'],
         'null next to a column' => [['number', null], 'null'],
     ]);
 

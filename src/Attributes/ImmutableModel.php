@@ -6,6 +6,7 @@ namespace Taldres\ImmutableAttributes\Attributes;
 
 use Attribute;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 use Taldres\ImmutableAttributes\Exceptions\InvalidImmutableColumnsException;
 
 /**
@@ -70,7 +71,7 @@ class ImmutableModel extends Immutable
         $names = Arr::flatten([$except], 1);
 
         foreach ($names as $name) {
-            if (! is_string($name) || trim($name) === '') {
+            if (! is_string($name) || Str::trim($name) === '') {
                 throw InvalidImmutableColumnsException::exceptInvalid($name);
             }
 
