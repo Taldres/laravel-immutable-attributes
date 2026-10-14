@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Taldres\ImmutableAttributes\Tests\Fixtures\Models;
 
+use Illuminate\Database\Eloquent\Attributes\Table;
+use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Taldres\ImmutableAttributes\Attributes\Immutable;
@@ -20,13 +22,11 @@ use Taldres\ImmutableAttributes\Concerns\GuardsImmutableAttributes;
  * @property array<string, mixed>|null $options
  */
 #[Immutable('number', 'customer_id', 'issued_at', 'options')]
+#[Table('invoices')]
+#[Unguarded]
 class Invoice extends Model
 {
     use GuardsImmutableAttributes;
-
-    protected $table = 'invoices';
-
-    protected $guarded = [];
 
     protected function casts(): array
     {

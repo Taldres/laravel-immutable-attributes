@@ -6,6 +6,7 @@ namespace Taldres\ImmutableAttributes\Attributes;
 
 use Attribute;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 use Taldres\ImmutableAttributes\Exceptions\InvalidImmutableColumnsException;
 
 /**
@@ -49,7 +50,7 @@ class Immutable
         // One level only: a list inside a list is not a column name. Arr::wrap()
         // would not do, it turns null into an empty list and drops it.
         foreach (Arr::flatten($columns, 1) as $name) {
-            if (! is_string($name) || trim($name) === '') {
+            if (! is_string($name) || Str::trim($name) === '') {
                 throw InvalidImmutableColumnsException::invalid($name);
             }
 
@@ -78,11 +79,11 @@ class Immutable
     }
 
     /**
-     * A name with whitespace around it, a non-breaking space included, would be
-     * guarded under that name and never match the column.
+     * A name with whitespace around it, a non-breaking or zero-width space
+     * included, would be guarded under that name and never match the column.
      */
     protected static function isPadded(string $name): bool
     {
-        return preg_match('/^\s|\s$/u', $name) === 1;
+        return Str::trim($name) !== $name;
     }
 }
