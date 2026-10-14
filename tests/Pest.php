@@ -4,4 +4,4 @@ declare(strict_types=1);
 
 use Taldres\ImmutableAttributes\Tests\TestCase;
 
-uses(TestCase::class)->in(__DIR__);
+pest()->extend(TestCase::class)->in('Feature');
