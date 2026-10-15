@@ -14,6 +14,21 @@ it('takes columns as an array', function () {
     expect((new Immutable(['number', 'customer_id']))->columns)->toBe(['number', 'customer_id']);
 });
 
+it('takes columns as a named argument', function () {
+    expect((new Immutable(columns: ['number', 'customer_id']))->columns)->toBe(['number', 'customer_id']);
+});
+
+it('knows no named argument but columns', function (Closure $make, string $name) {
+    expect($make)->toThrow(
+        InvalidImmutableColumnsException::class,
+        "#[Immutable] has no argument named \"{$name}\". It takes column names, or columns: [...].",
+    );
+})->with([
+    'the except of #[ImmutableModel]' => [fn () => new Immutable('number', except: ['note']), 'except'],
+    'a typo next to a column' => [fn () => new Immutable('number', colums: ['total']), 'colums'],
+    'a singular name' => [fn () => new Immutable(column: 'number'), 'column'],
+]);
+
 it('drops duplicate columns', function () {
     expect((new Immutable('number', ['number', 'total']))->columns)->toBe(['number', 'total']);
 });

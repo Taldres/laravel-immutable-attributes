@@ -67,9 +67,14 @@ class Invoice extends Model
 }
 ```
 
-`#[Immutable(['number', 'customer_id'])]` works as well. It needs at least one
-column and does not take `'*'`, empty names, names with whitespace around them
-(a non-breaking or zero-width space counts), non-strings or JSON paths such as
+`#[Immutable(['number', 'customer_id'])]` works as well, and so does the named
+argument `columns:`. Any other name is rejected, because
+`#[Immutable('number', except: ['note'])]` would otherwise guard `note` too, the
+opposite of what `except` means on `#[ImmutableModel]`.
+
+A declaration needs at least one column and does not take `'*'`, empty names,
+names with whitespace around them (a non-breaking or zero-width space counts),
+non-strings or JSON paths such as
 `'options->currency'`; the guard compares whole columns, so guard `'options'`
 instead. A model declared that way fails when it boots with an
 `InvalidImmutableColumnsException` that names the class carrying the attribute.
