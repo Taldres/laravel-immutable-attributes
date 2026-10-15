@@ -11,8 +11,8 @@ on:
       - main
       - '*.x'
   pull_request:
-  # Called by the scheduled workflow on main, because a schedule starts only on
-  # the default branch. The ref names the branch to test.
+  # Called by the weekly workflow on the default branch, because a schedule
+  # starts only there. The ref names the branch to test.
   workflow_call:
     inputs:
       ref:

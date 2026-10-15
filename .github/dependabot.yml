@@ -1,9 +1,15 @@
 # Please see the documentation for all configuration options:
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
+# Dependabot reads this file from the default branch only. Both branches that
+# get updates are listed with target-branch, so the file works whichever of them
+# is the default. 1.x stays on the Laravel versions it supports: the next major
+# version of the framework belongs to main.
+
 version: 2
 updates:
   - package-ecosystem: "github-actions"
+    target-branch: "main"
     directory: "/"
     schedule:
       interval: "weekly"
@@ -11,8 +17,30 @@ updates:
       - "dependencies"
 
   - package-ecosystem: "composer"
+    target-branch: "main"
     directory: "/"
     schedule:
       interval: "weekly"
     labels:
       - "dependencies"
+
+  - package-ecosystem: "github-actions"
+    target-branch: "1.x"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "composer"
+    target-branch: "1.x"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+    ignore:
+      - dependency-name: "illuminate/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "orchestra/testbench"
+        update-types: ["version-update:semver-major"]
