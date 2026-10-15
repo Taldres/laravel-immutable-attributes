@@ -1,0 +1,40 @@
+name: maintenance branches
+
+# A schedule starts only on the default branch, so the workflow there calls the
+# test workflows of every maintained branch itself, its own included. Each runs
+# with the matrix of its branch, and a failure shows up in this run. The file is
+# the same on every branch, so it keeps working when the default branch changes.
+
+on:
+  schedule:
+    # Weekly, so a change in Laravel that the guard depends on shows up without a push.
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests-main:
+    name: tests main
+    uses: Taldres/laravel-immutable-attributes/.github/workflows/tests.yml@main
+    with:
+      ref: main
+
+  databases-main:
+    name: databases main
+    uses: Taldres/laravel-immutable-attributes/.github/workflows/databases.yml@main
+    with:
+      ref: main
+
+  tests-1x:
+    name: tests 1.x
+    uses: Taldres/laravel-immutable-attributes/.github/workflows/tests.yml@1.x
+    with:
+      ref: 1.x
+
+  databases-1x:
+    name: databases 1.x
+    uses: Taldres/laravel-immutable-attributes/.github/workflows/databases.yml@1.x
+    with:
+      ref: 1.x
