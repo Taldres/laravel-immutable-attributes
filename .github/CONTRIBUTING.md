@@ -15,7 +15,7 @@ query builder writes are out of scope; build them as separate packages.
 1. Fork the project
 2. Create a new branch
 3. Code, test, commit, and push
-4. Open a pull request detailing your changes, against `main` for the upcoming major version or against the maintenance branch, such as `1.x`, for a fix to an older major version
+4. Open a pull request detailing your changes, against `main` for the upcoming major version or against the maintenance branch, such as `1.x`, for a fix to an older major version. The default branch of the repository is `1.x` while the next major version is unreleased, so choose the base branch yourself
 
 ## Guidelines
 
