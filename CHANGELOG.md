@@ -1,6 +1,27 @@
 # Release Notes
 
-## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.5.0...1.x)
+## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.6.0...1.x)
+
+## [v1.6.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.5.0...v1.6.0) - 2026-10-15
+
+#### Upgrade notes
+
+- **A named argument other than `columns:` in `#[Immutable]` now throws.** `#[Immutable('number', except: ['note'])]`, `#[Immutable(column: 'number')]` or `#[Immutable('number', colums: ['total'])]` used to boot and guard the values of those arguments as columns. They now raise `InvalidImmutableColumnsException` when the model boots. Pass the columns positionally or as `columns: [...]`.
+- `getImmutableAttributes()` returns the same columns as before, but their order can differ for models that use traits.
+- Everything else stays as it is: `#[Immutable('number')]`, `#[Immutable(['number'])]` and `#[Immutable(columns: ['number'])]` work as before.
+
+<!-- Release notes generated using configuration in .github/release.yml at 1.x -->
+### What's Changed
+
+#### Bug Fixes
+
+* Reject unknown named arguments in #[Immutable] by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/33
+
+#### Maintenance
+
+* Use Laravel's class helpers and clean up the tests by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/32
+
+**Full Changelog**: https://github.com/Taldres/laravel-immutable-attributes/compare/v1.5.0...v1.6.0
 
 ## [v1.5.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.4.1...v1.5.0) - 2026-10-13
 
