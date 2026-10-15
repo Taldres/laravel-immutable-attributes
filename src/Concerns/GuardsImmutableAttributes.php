@@ -6,6 +6,7 @@ namespace Taldres\ImmutableAttributes\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use ReflectionAttribute;
 use ReflectionClass;
@@ -268,13 +269,12 @@ trait GuardsImmutableAttributes
      */
     protected static function resolveImmutableAttributes(): array
     {
-        $columns = [];
-
-        foreach (self::attributesDeclaredOn(new ReflectionClass(static::class)) as $attribute) {
-            array_push($columns, ...$attribute->columns);
-        }
-
-        return array_values(array_unique($columns));
+        return array_values(
+            self::attributesDeclaredOn(static::class)
+                ->flatMap(fn (Immutable $attribute): array => $attribute->columns)
+                ->unique()
+                ->all(),
+        );
     }
 
     /**
@@ -285,48 +285,48 @@ trait GuardsImmutableAttributes
      */
     protected static function resolveMutableAttributes(): array
     {
-        $lists = [];
-
-        foreach (self::attributesDeclaredOn(new ReflectionClass(static::class)) as $attribute) {
-            if ($attribute instanceof ImmutableModel) {
-                $lists[] = $attribute->except;
-            }
-        }
+        $lists = self::attributesDeclaredOn(static::class)
+            ->filter(fn (Immutable $attribute): bool => $attribute instanceof ImmutableModel)
+            ->map(fn (ImmutableModel $attribute): array => $attribute->except)
+            ->all();
 
         return $lists === [] ? [] : array_values(array_intersect(...$lists));
     }
 
     /**
      * Collects #[Immutable] and its subclasses, such as #[ImmutableModel], from
-     * the class, the traits it uses, and its parents.
+     * the class, its parents, and the traits any of them use.
      *
-     * @template TClass of object
+     * @param  class-string  $class
+     * @return Collection<int, Immutable>
      *
-     * @param  ReflectionClass<TClass>  $class
+     * @throws InvalidImmutableColumnsException
+     */
+    private static function attributesDeclaredOn(string $class): Collection
+    {
+        return (new Collection([$class, ...class_parents($class), ...class_uses_recursive($class)]))
+            ->flatMap(fn (string $declaring): array => self::attributesOn($declaring));
+    }
+
+    /**
      * @return list<Immutable>
      *
      * @throws InvalidImmutableColumnsException
      */
-    private static function attributesDeclaredOn(ReflectionClass $class): array
+    private static function attributesOn(string $class): array
     {
-        $attributes = [];
+        // class_uses_recursive() returns the traits as plain strings, not class-strings.
+        $reflection = new ReflectionClass($class); // @phpstan-ignore argument.type
 
-        foreach ($class->getAttributes(Immutable::class, ReflectionAttribute::IS_INSTANCEOF) as $attribute) {
-            try {
-                $attributes[] = $attribute->newInstance();
-            } catch (InvalidImmutableColumnsException $e) {
-                throw $e->declaredOn($class->getName());
-            }
-        }
-
-        foreach ($class->getTraits() as $trait) {
-            array_push($attributes, ...self::attributesDeclaredOn($trait));
-        }
-
-        if ($parent = $class->getParentClass()) {
-            array_push($attributes, ...self::attributesDeclaredOn($parent));
-        }
-
-        return $attributes;
+        return array_map(
+            function (ReflectionAttribute $attribute) use ($class): Immutable {
+                try {
+                    return $attribute->newInstance();
+                } catch (InvalidImmutableColumnsException $e) {
+                    throw $e->declaredOn($class);
+                }
+            },
+            $reflection->getAttributes(Immutable::class, ReflectionAttribute::IS_INSTANCEOF),
+        );
     }
 }
