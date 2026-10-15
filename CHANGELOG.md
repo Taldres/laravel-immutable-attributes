@@ -1,6 +1,48 @@
 # Release Notes
 
-## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.4.1...main)
+## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.6.0...main)
+
+## [v1.6.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.5.0...v1.6.0) - 2026-10-15
+
+#### Upgrade notes
+
+- **A named argument other than `columns:` in `#[Immutable]` now throws.** `#[Immutable('number', except: ['note'])]`, `#[Immutable(column: 'number')]` or `#[Immutable('number', colums: ['total'])]` used to boot and guard the values of those arguments as columns. They now raise `InvalidImmutableColumnsException` when the model boots. Pass the columns positionally or as `columns: [...]`.
+- `getImmutableAttributes()` returns the same columns as before, but their order can differ for models that use traits.
+- Everything else stays as it is: `#[Immutable('number')]`, `#[Immutable(['number'])]` and `#[Immutable(columns: ['number'])]` work as before.
+
+<!-- Release notes generated using configuration in .github/release.yml at 1.x -->
+### What's Changed
+
+#### Bug Fixes
+
+* Reject unknown named arguments in #[Immutable] by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/33
+
+#### Maintenance
+
+* Use Laravel's class helpers and clean up the tests by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/32
+
+**Full Changelog**: https://github.com/Taldres/laravel-immutable-attributes/compare/v1.5.0...v1.6.0
+
+## [v1.5.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.4.1...v1.5.0) - 2026-10-13
+
+#### Upgrade notes
+
+- **An increment by `0` of an immutable column throws.** `increment()`, `decrement()`, their `Each` and `Quietly` variants and the same calls inside `Model::withoutEvents()` or `Model::withoutTimestamps()` now throw `ImmutableAttributeException` when they name an immutable column, whatever the amount. An increment by `0` still writes its column, and the database turns the value into a number, so `001` in a text column became `1` without an exception. To change such a column on purpose, write through the query builder or allow it with `except` on `#[ImmutableModel]`.
+- **On SQLite, a column left out matches another column only by ASCII case.** SQLite treats `café` and `CAFÉ` as two columns, so `#[ImmutableModel(except: ['café'])]` no longer leaves out `CAFÉ` as well. The same applies to entries returned by `getImmutableAttributes()` and `getMutableAttributes()`.
+- **Unchanged:** increments of mutable columns, the update timestamp an increment writes, and how column names are matched on MySQL, MariaDB and PostgreSQL.
+
+<!-- Release notes generated using configuration in .github/release.yml at 1.x -->
+### What's Changed
+
+#### Bug Fixes
+
+* Guard increments by zero and SQLite columns beyond ASCII case by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/27
+
+#### Dependencies
+
+* build(deps): bump shivammathur/setup-php from 2.37.2 to 2.40.0 by @dependabot[bot] in https://github.com/Taldres/laravel-immutable-attributes/pull/25
+
+**Full Changelog**: https://github.com/Taldres/laravel-immutable-attributes/compare/v1.4.1...v1.5.0
 
 ## [v1.4.1](https://github.com/taldres/laravel-immutable-attributes/compare/v1.3.0...v1.4.1) - 2026-10-12
 
