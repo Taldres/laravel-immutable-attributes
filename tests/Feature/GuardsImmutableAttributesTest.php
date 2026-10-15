@@ -44,6 +44,10 @@ use Taldres\ImmutableAttributes\Tests\Fixtures\Models\TouchingLedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\TraitCountedInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\UnusableInvoice;
 
+use function Pest\Laravel\assertDatabaseCount;
+use function Pest\Laravel\assertNotSoftDeleted;
+use function Pest\Laravel\assertSoftDeleted;
+
 /**
  * @param  array<string, mixed>  $attributes
  */
@@ -335,18 +339,13 @@ describe('column name aliases', function () {
     });
 
     it('decides without a database connection unless only the case differs', function () {
-        $resolver = Model::getConnectionResolver();
         Model::unsetConnectionResolver();
 
-        try {
-            $invoice = new Invoice;
+        $invoice = new Invoice;
 
-            expect($invoice->isImmutableAttribute('number'))->toBeTrue()
-                ->and($invoice->isImmutableAttribute('invoices.number'))->toBeTrue()
-                ->and($invoice->isImmutableAttribute('total'))->toBeFalse();
-        } finally {
-            Model::setConnectionResolver($resolver);
-        }
+        expect($invoice->isImmutableAttribute('number'))->toBeTrue()
+            ->and($invoice->isImmutableAttribute('invoices.number'))->toBeTrue()
+            ->and($invoice->isImmutableAttribute('total'))->toBeFalse();
     });
 
     it('names the written columns when the whole model is guarded', function () {
@@ -661,7 +660,7 @@ describe('the whole model', function () {
         $entry->delete();
 
         expect(fn () => $entry->restore())->toThrow(ImmutableAttributeException::class, '[deleted_at]');
-        expect(DB::table('ledger_entries')->value('deleted_at'))->not->toBeNull();
+        assertSoftDeleted($entry);
     });
 });
 
@@ -756,7 +755,7 @@ describe('leaving columns out of the whole model', function () {
         $entry->delete();
 
         expect($entry->restore())->toBeTrue();
-        expect(DB::table('ledger_entries')->value('deleted_at'))->toBeNull();
+        assertNotSoftDeleted($entry);
         expect(fn () => $entry->update(['amount' => 200]))->toThrow(ImmutableAttributeException::class, '[amount]');
     });
 
@@ -825,35 +824,25 @@ describe('leaving columns out of the whole model', function () {
         ConfiguredInvoice::$frozen = ['*'];
         ConfiguredInvoice::$loose = ['note'];
 
-        try {
-            $invoice = ConfiguredInvoice::query()->create(['number' => 'INV-001', 'customer_id' => 7, 'issued_at' => now()]);
+        $invoice = ConfiguredInvoice::query()->create(['number' => 'INV-001', 'customer_id' => 7, 'issued_at' => now()]);
 
-            expect($invoice->isImmutableAttribute('note'))->toBeFalse()
-                ->and($invoice->isImmutableAttribute('number'))->toBeTrue();
+        expect($invoice->isImmutableAttribute('note'))->toBeFalse()
+            ->and($invoice->isImmutableAttribute('number'))->toBeTrue();
 
-            $invoice->saveQuietly();
-            ConfiguredInvoice::$loose = ['note', 'updated_at'];
+        $invoice->saveQuietly();
+        ConfiguredInvoice::$loose = ['note', 'updated_at'];
 
-            expect($invoice->update(['note' => 'Checked']))->toBeTrue();
-        } finally {
-            ConfiguredInvoice::$frozen = [];
-            ConfiguredInvoice::$loose = [];
-        }
+        expect($invoice->update(['note' => 'Checked']))->toBeTrue();
     });
 
     it('rejects a getMutableAttributes() override that returns anything but column names', function () {
         ConfiguredInvoice::$frozen = ['*'];
         ConfiguredInvoice::$loose = ['note', 123];
 
-        try {
-            expect(fn () => (new ConfiguredInvoice)->isImmutableAttribute('number'))->toThrow(
-                InvalidImmutableColumnsException::class,
-                ConfiguredInvoice::class.'::getMutableAttributes() must return column names as non-empty strings, int given.',
-            );
-        } finally {
-            ConfiguredInvoice::$frozen = [];
-            ConfiguredInvoice::$loose = [];
-        }
+        expect(fn () => (new ConfiguredInvoice)->isImmutableAttribute('number'))->toThrow(
+            InvalidImmutableColumnsException::class,
+            ConfiguredInvoice::class.'::getMutableAttributes() must return column names as non-empty strings, int given.',
+        );
     });
 
     it('rejects an except that holds the wildcard when the model boots, naming where it is declared', function () {
@@ -958,19 +947,15 @@ describe('resolving the attributes', function () {
     it('rejects a getImmutableAttributes() override that returns anything but column names', function (array $returned, string $given) {
         UnusableInvoice::$returned = $returned;
 
-        try {
-            $invoice = new UnusableInvoice;
-            $invoice->setRawAttributes(['id' => 1, 'number' => 'INV-001'], true)->exists = true;
-            $invoice->number = 'INV-999';
+        $invoice = new UnusableInvoice;
+        $invoice->setRawAttributes(['id' => 1, 'number' => 'INV-001'], true)->exists = true;
+        $invoice->number = 'INV-999';
 
-            expect(fn () => $invoice->isImmutableAttribute('number'))->toThrow(
-                InvalidImmutableColumnsException::class,
-                UnusableInvoice::class."::getImmutableAttributes() must return column names as non-empty strings, {$given} given.",
-            );
-            expect(fn () => $invoice->save())->toThrow(InvalidImmutableColumnsException::class);
-        } finally {
-            UnusableInvoice::$returned = [];
-        }
+        expect(fn () => $invoice->isImmutableAttribute('number'))->toThrow(
+            InvalidImmutableColumnsException::class,
+            UnusableInvoice::class."::getImmutableAttributes() must return column names as non-empty strings, {$given} given.",
+        );
+        expect(fn () => $invoice->save())->toThrow(InvalidImmutableColumnsException::class);
     })->with([
         'an integer' => [[123], 'int'],
         'a nested list' => [[['number']], 'array'],
@@ -981,14 +966,10 @@ describe('resolving the attributes', function () {
     it('rejects a getImmutableAttributes() override that returns a name with whitespace around it', function () {
         UnusableInvoice::$returned = ['number', ' customer_id'];
 
-        try {
-            expect(fn () => (new UnusableInvoice)->isImmutableAttribute('number'))->toThrow(
-                InvalidImmutableColumnsException::class,
-                UnusableInvoice::class.'::getImmutableAttributes() must return column names without whitespace around them, " customer_id" given.',
-            );
-        } finally {
-            UnusableInvoice::$returned = [];
-        }
+        expect(fn () => (new UnusableInvoice)->isImmutableAttribute('number'))->toThrow(
+            InvalidImmutableColumnsException::class,
+            UnusableInvoice::class.'::getImmutableAttributes() must return column names without whitespace around them, " customer_id" given.',
+        );
     });
 
     it('reads presets that extend #[ImmutableModel]', function () {
@@ -1105,7 +1086,7 @@ describe('outside the model', function () {
 
         $entry->forceDelete();
 
-        expect(DB::table('ledger_entries')->count())->toBe(0);
+        assertDatabaseCount('ledger_entries', 0);
     });
 
     it('leaves deleting alone', function () {
