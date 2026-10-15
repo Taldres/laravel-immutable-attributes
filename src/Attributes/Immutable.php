@@ -33,6 +33,12 @@ class Immutable
      */
     public function __construct(mixed ...$columns)
     {
+        foreach (array_keys($columns) as $name) {
+            if (is_string($name) && $name !== 'columns') {
+                throw InvalidImmutableColumnsException::unknownColumnsArgument($name);
+            }
+        }
+
         $this->columns = $this->columnsFrom($columns);
     }
 

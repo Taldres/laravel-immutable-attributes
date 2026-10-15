@@ -9,7 +9,8 @@ use InvalidArgumentException;
 
 /**
  * Thrown when the attributes to guard are misdeclared: #[Immutable] without a
- * column, with "*" or with anything that is not a plain column name,
+ * column, with "*", with a named argument other than columns or with anything
+ * that is not a plain column name,
  * #[ImmutableModel] with columns or with an except that is not a list of plain
  * column names, or a getImmutableAttributes() or getMutableAttributes()
  * override that returns something other than column names.
@@ -38,6 +39,11 @@ class InvalidImmutableColumnsException extends InvalidArgumentException
     public static function unknownArgument(string $name): self
     {
         return new self("#[ImmutableModel] has no argument named \"{$name}\". It takes except: [...] to leave columns out.");
+    }
+
+    public static function unknownColumnsArgument(string $name): self
+    {
+        return new self("#[Immutable] has no argument named \"{$name}\". It takes column names, or columns: [...].");
     }
 
     public static function exceptInvalid(mixed $value): self
