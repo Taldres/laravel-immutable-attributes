@@ -1,6 +1,6 @@
 # Release Notes
 
-## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.6.0...1.x)
+## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.6.0...main)
 
 ## [v1.6.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.5.0...v1.6.0) - 2026-10-15
 

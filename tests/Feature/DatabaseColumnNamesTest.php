@@ -3,9 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Database\QueryException;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * The guard decides from the key it is given which column the database will
@@ -37,21 +35,6 @@ function storedInvoiceNumber(int $id): mixed
 }
 
 describe('how the database reads a column name', function () {
-    it('resolves a column name in any case outside PostgreSQL', function () {
-        $id = insertInvoiceRow();
-
-        updateInvoiceRow($id, ['NUMBER' => 'INV-999']);
-
-        expect(storedInvoiceNumber($id))->toBe('INV-999');
-    })->skip(fn () => onPostgres(), 'PostgreSQL quotes identifiers, so "NUMBER" is another column.');
-
-    it('has no column that differs in case on PostgreSQL', function () {
-        $id = insertInvoiceRow();
-
-        expect(fn () => updateInvoiceRow($id, ['NUMBER' => 'INV-999']))->toThrow(QueryException::class);
-        expect(storedInvoiceNumber($id))->toBe('INV-001');
-    })->skip(fn () => ! onPostgres(), 'Only PostgreSQL tells "NUMBER" and "number" apart.');
-
     it('resolves the table name in front of a column', function () {
         $id = insertInvoiceRow();
 
@@ -69,30 +52,6 @@ describe('how the database reads a column name', function () {
         };
 
         expect(storedInvoiceNumber($id))->toBe(in_array(DB::connection()->getDriverName(), ['sqlite', 'pgsql'], true) ? 'INV-999' : 'INV-001');
-    });
-
-    it('folds case beyond ASCII in MySQL and MariaDB only, and never accents', function () {
-        Schema::create('accented_rows', function (Blueprint $table): void {
-            $table->id();
-            $table->string('café')->nullable();
-        });
-
-        try {
-            $folds = in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true);
-            $id = DB::table('accented_rows')->insertGetId(['café' => 'a']);
-
-            if ($folds) {
-                DB::table('accented_rows')->where('id', $id)->update(['CAFÉ' => 'b']);
-
-                expect(DB::table('accented_rows')->where('id', $id)->value('café'))->toBe('b');
-            } else {
-                expect(fn () => DB::table('accented_rows')->where('id', $id)->update(['CAFÉ' => 'b']))->toThrow(QueryException::class);
-            }
-
-            expect(fn () => DB::table('accented_rows')->where('id', $id)->update(['cafe' => 'c']))->toThrow(QueryException::class);
-        } finally {
-            Schema::dropIfExists('accented_rows');
-        }
     });
 
     it('writes a JSON path into its column', function () {

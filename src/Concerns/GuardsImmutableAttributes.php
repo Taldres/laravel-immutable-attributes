@@ -97,13 +97,6 @@ trait GuardsImmutableAttributes
     }
 
     /**
-     * Model::incrementEach() arrived in Laravel 13.3; the override is never
-     * called on earlier versions.
-     *
-     * @todo Laravel 13.3: Once composer.json requires ^13.3, drop the note
-     * above, the incrementEach() skips in the tests and the Laravel 13.3 notes
-     * in the README and Boost skill.
-     *
      * @param  array<string, float|int>  $columns
      * @param  array<string, mixed>  $extra
      */
@@ -185,6 +178,10 @@ trait GuardsImmutableAttributes
      * when "*" guards the model and the column is not left out. A key counts as
      * the column it writes: "options->currency" writes "options", and the SQLite
      * and PostgreSQL grammars drop any qualifier, as in "invoices.number".
+     *
+     * Databases disagree on whether "NUMBER" and "number" are one column, so
+     * the guard errs towards throwing: an immutable attribute matches in any
+     * case, while a column left out must be named exactly.
      */
     private function immutableAttributeWrittenBy(string $key): ?string
     {
@@ -193,7 +190,10 @@ trait GuardsImmutableAttributes
 
         array_walk($immutable, fn (mixed $attribute) => $this->assertColumnName($attribute, 'getImmutableAttributes'));
 
-        if (($declared = $this->listedColumn($immutable, $column)) !== null) {
+        $folded = mb_strtolower($column, 'UTF-8');
+        $declared = Arr::first($immutable, fn (string $listed): bool => mb_strtolower(self::columnWrittenBy($listed), 'UTF-8') === $folded);
+
+        if ($declared !== null) {
             return $declared;
         }
 
@@ -205,44 +205,9 @@ trait GuardsImmutableAttributes
 
         array_walk($mutable, fn (mixed $attribute) => $this->assertColumnName($attribute, 'getMutableAttributes'));
 
-        return $this->listedColumn($mutable, $column) === null ? $column : null;
-    }
+        $leftOut = Arr::first($mutable, fn (string $listed): bool => self::columnWrittenBy($listed) === $column);
 
-    /**
-     * The entry of the list that names the column, as listed. Case counts on
-     * PostgreSQL, where Laravel quotes identifiers and "NUMBER" is a different
-     * column, so the connection is asked only when nothing but case differs.
-     * SQLite folds ASCII only, so "CAFÉ" and "café" are two columns there.
-     * Elsewhere case is folded for the whole of Unicode: MySQL and MariaDB do
-     * so for "CAFÉ" and "café", while they keep "cafe" apart.
-     *
-     * @param  list<string>  $columns
-     */
-    private function listedColumn(array $columns, string $column): ?string
-    {
-        $differentCase = [];
-
-        foreach ($columns as $listed) {
-            $name = self::columnWrittenBy($listed);
-
-            if ($name === $column) {
-                return $listed;
-            }
-
-            if (mb_strtolower($name, 'UTF-8') === mb_strtolower($column, 'UTF-8')) {
-                $differentCase[] = $listed;
-            }
-        }
-
-        if ($differentCase === []) {
-            return null;
-        }
-
-        return match ($this->getConnection()->getDriverName()) {
-            'pgsql' => null,
-            'sqlite' => Arr::first($differentCase, fn (string $listed): bool => strtolower(self::columnWrittenBy($listed)) === strtolower($column)),
-            default => $differentCase[0],
-        };
+        return $leftOut === null ? $column : null;
     }
 
     /**
@@ -254,7 +219,9 @@ trait GuardsImmutableAttributes
      */
     private function assertColumnName(mixed $attribute, string $method): void
     {
-        if (! is_string($attribute) || trim($attribute) === '' || preg_match('/^\s|\s$/u', $attribute) === 1) {
+        $trimmed = is_string($attribute) ? Str::trim($attribute) : null;
+
+        if ($trimmed === null || $trimmed === '' || $trimmed !== $attribute) {
             throw InvalidImmutableColumnsException::returnedBy(static::class, $method, $attribute);
         }
     }
