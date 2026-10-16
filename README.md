@@ -7,7 +7,7 @@
 [![Packagist Downloads](https://img.shields.io/packagist/dt/taldres/laravel-immutable-attributes)](https://packagist.org/packages/taldres/laravel-immutable-attributes)
 ![Tests](https://img.shields.io/github/actions/workflow/status/taldres/laravel-immutable-attributes/tests.yml?label=tests)
 ![PHPStan](https://img.shields.io/badge/PHPStan-level%2010-brightgreen)
-![Laravel](https://img.shields.io/badge/Laravel-13.3%2B-red)
+![Laravel](https://img.shields.io/badge/Laravel-12%20%7C%2013-red)
 ![PHP](https://img.shields.io/badge/PHP-8.3%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
@@ -38,10 +38,7 @@ looks normal, and the damage shows up much later.
 ## Requirements
 
 - PHP 8.3+
-- Laravel 13.3 or later
-
-Laravel 12 is supported by version 1, which receives fixes on the `1.x` branch:
-`composer require taldres/laravel-immutable-attributes:^1.0`.
+- Laravel 12 or 13
 
 ## Installation
 
@@ -73,8 +70,7 @@ argument `columns:`. Any other name is rejected, because
 opposite of what `except` means on `#[ImmutableModel]`.
 
 A declaration needs at least one column and does not take `'*'`, empty names,
-names with whitespace around them (a non-breaking or zero-width space counts),
-non-strings or JSON paths such as
+names with whitespace around them, non-strings or JSON paths such as
 `'options->currency'`; the guard compares whole columns, so guard `'options'`
 instead. A model declared that way fails when it boots with an
 `InvalidImmutableColumnsException` that names the class carrying the attribute.
@@ -209,9 +205,9 @@ another column.
 | `fill()` and `forceFill()` followed by a save | `increment()` and `decrement()` on a model that does not exist yet, which Laravel runs as a query on the whole table |
 | `saveQuietly()`, `updateQuietly()` and saves inside `Model::withoutEvents()` | Deleting and soft deleting |
 | Changes made by `updating` listeners and observers | Parent timestamps touched through `$touches` |
-| `increment()` and `decrement()`, including the extra columns and the update timestamp they write; an immutable extra column throws even with its current value | |
+| `increment()` and `decrement()`, including the extra columns and the update timestamp they write; an immutable extra column throws even with its current value | `incrementEach()` and `decrementEach()` before Laravel 13.3, which Laravel runs as a query on the whole table |
 | `incrementQuietly()` and `decrementQuietly()`, and `increment()` and `decrement()` inside `Model::withoutEvents()` | |
-| `incrementEach()` and `decrementEach()`, and on Laravel 13.20 and later their `Quietly` variants | |
+| `incrementEach()` and `decrementEach()` on Laravel 13.3 and later, and on Laravel 13.20 and later their `Quietly` variants | |
 | `touch()` when the touched column is immutable, such as `updated_at` under `#[ImmutableModel]` | |
 | `restore()` when `deleted_at` is immutable, such as under `#[ImmutableModel]` | |
 
@@ -241,24 +237,20 @@ protected function getDirtyForUpdate(): array
 }
 ```
 
-The same applies to `incrementOrDecrement()` and `incrementOrDecrementEach()`:
-the trait overrides them to check the columns an increment writes, before the
-increment runs and whether or not it fires events, so a model that defines them
-needs the same aliasing and the trait's return type, `int|false`. A rejected
-increment leaves the model as it was.
+The same applies to `incrementOrDecrement()` and, on Laravel 13.3 and later,
+`incrementOrDecrementEach()`: the trait overrides them to check the columns an
+increment writes, before the increment runs and whether or not it fires events,
+so a model that defines them needs the same aliasing and the trait's return
+type, `int|false`. A rejected increment leaves the model as it was.
 
 A key counts as the column it writes, whatever its qualifier: `invoices.number`
-counts as `number`, and `options->currency` counts as `options`. Entries
-returned by `getImmutableAttributes()` are matched the same way, so
-`'options->currency'` there guards the whole `options` column. The exception
-names the attribute as declared.
-
-Databases disagree on whether `NUMBER` and `number` are the same column, so the
-guard leans towards throwing. An immutable attribute matches in any case:
-`NUMBER` counts as `number` on every database. A column left out with `except`
-or `getMutableAttributes()` only counts under its exact name, so with
-`except: ['views']` a write to `VIEWS` throws. Name it in the case your code
-writes it.
+counts as `number`, and `options->currency` counts as `options`. Case does not
+count either, so `NUMBER` is `number`, except on PostgreSQL, where Laravel quotes
+identifiers and `NUMBER` is a different column. SQLite folds ASCII case only, so
+there `CAFÉ` and `café` are two columns. Entries returned by
+`getImmutableAttributes()` are matched the same way, so `'options->currency'`
+there guards the whole `options` column. The exception names the attribute as
+declared.
 
 An increment by `0` of an immutable column throws as well. Its query still
 writes the column, and the database turns the value into a number, so `001` in

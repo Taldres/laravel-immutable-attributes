@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Taldres\ImmutableAttributes\Tests\Fixtures\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Table;
-use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Model;
 use Taldres\ImmutableAttributes\Concerns\GuardsImmutableAttributes;
 
@@ -16,8 +14,6 @@ use Taldres\ImmutableAttributes\Concerns\GuardsImmutableAttributes;
  * @property string $number
  * @property string|null $note
  */
-#[Table('invoices')]
-#[Unguarded]
 class ConfiguredInvoice extends Model
 {
     use GuardsImmutableAttributes;
@@ -31,6 +27,10 @@ class ConfiguredInvoice extends Model
      * @var list<string>
      */
     public static array $loose = [];
+
+    protected $table = 'invoices';
+
+    protected $guarded = [];
 
     /**
      * @return list<string>
