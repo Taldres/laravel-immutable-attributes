@@ -55,7 +55,7 @@ class InvalidImmutableColumnsException extends InvalidArgumentException
 
     public static function exceptPadded(string $column): self
     {
-        return new self('#[ImmutableModel] takes column names without whitespace around them in except, '.self::quoted($column).' given. Use '.self::quoted(Str::trim($column)).' instead.');
+        return new self('#[ImmutableModel] takes column names without whitespace around them in except, '.self::quoted($column).' given. Use '.self::quoted(self::trimmed($column)).' instead.');
     }
 
     public static function exceptWildcard(): self
@@ -79,7 +79,7 @@ class InvalidImmutableColumnsException extends InvalidArgumentException
 
     public static function padded(string $column): self
     {
-        return new self('#[Immutable] takes column names without whitespace around them, '.self::quoted($column).' given. Use '.self::quoted(Str::trim($column)).' instead.');
+        return new self('#[Immutable] takes column names without whitespace around them, '.self::quoted($column).' given. Use '.self::quoted(self::trimmed($column)).' instead.');
     }
 
     public static function jsonPath(string $column): self
@@ -94,7 +94,7 @@ class InvalidImmutableColumnsException extends InvalidArgumentException
      */
     public static function returnedBy(string $model, string $method, mixed $value): self
     {
-        if (is_string($value) && Str::trim($value) !== '') {
+        if (is_string($value) && trim($value) !== '') {
             return new self("{$model}::{$method}() must return column names without whitespace around them, ".self::quoted($value).' given.');
         }
 
@@ -110,6 +110,11 @@ class InvalidImmutableColumnsException extends InvalidArgumentException
     private static function quoted(string $value): string
     {
         return (string) json_encode($value, JSON_INVALID_UTF8_SUBSTITUTE);
+    }
+
+    private static function trimmed(string $value): string
+    {
+        return (string) preg_replace('/^\s+|\s+$/u', '', $value);
     }
 
     /**

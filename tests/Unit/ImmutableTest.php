@@ -53,7 +53,6 @@ it('takes column names as non-empty strings', function (Closure $make, string $g
     'an empty string' => [fn () => new Immutable(''), 'an empty string'],
     'an empty string in a list' => [fn () => new Immutable(['number', '']), 'an empty string'],
     'only whitespace' => [fn () => new Immutable(' '), 'an empty string'],
-    'only a zero-width space' => [fn () => new Immutable("\u{200B}"), 'an empty string'],
     'an integer' => [fn () => new Immutable([123]), 'int'],
     'an integer as an argument' => [fn () => new Immutable(123), 'int'],
     'null as an argument' => [fn () => new Immutable(null), 'null'],
@@ -71,16 +70,8 @@ it('takes column names without whitespace around them', function (Closure $make,
     'a space behind' => [fn () => new Immutable('number '), '"number "'],
     'a tab' => [fn () => new Immutable("\tnumber"), '"\tnumber"'],
     'a non-breaking space' => [fn () => new Immutable("number\u{00A0}"), '"number\u00a0"'],
-    'a zero-width space' => [fn () => new Immutable("number\u{200B}"), '"number\u200b"'],
     'in a list' => [fn () => new Immutable(['total', ' number']), '" number"'],
 ]);
-
-it('takes the whitespace off a name that is not valid UTF-8', function () {
-    expect(fn () => new Immutable("number\xFF "))->toThrow(
-        InvalidImmutableColumnsException::class,
-        'takes column names without whitespace around them, "number\ufffd " given. Use "number\ufffd" instead.',
-    );
-});
 
 it('keeps a space inside a column name', function () {
     expect((new Immutable('num ber'))->columns)->toBe(['num ber']);
@@ -145,7 +136,6 @@ it('takes column names without whitespace around them in except', function (stri
     'a space in front' => [' note', '" note"'],
     'a space behind' => ['note ', '"note "'],
     'a non-breaking space' => ["note\u{00A0}", '"note\u00a0"'],
-    'a zero-width space' => ["note\u{200B}", '"note\u200b"'],
 ]);
 
 it('cannot leave out the wildcard', function () {

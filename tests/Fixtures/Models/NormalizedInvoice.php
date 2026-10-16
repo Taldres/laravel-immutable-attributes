@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Taldres\ImmutableAttributes\Tests\Fixtures\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Table;
-use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Taldres\ImmutableAttributes\Attributes\Immutable;
@@ -21,11 +19,13 @@ use Taldres\ImmutableAttributes\Concerns\GuardsImmutableAttributes;
  * @property int $total
  */
 #[Immutable('number', 'paid')]
-#[Table('invoices')]
-#[Unguarded]
 class NormalizedInvoice extends Model
 {
     use GuardsImmutableAttributes;
+
+    protected $table = 'invoices';
+
+    protected $guarded = [];
 
     protected function casts(): array
     {
