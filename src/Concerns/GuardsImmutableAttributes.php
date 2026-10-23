@@ -183,14 +183,36 @@ trait GuardsImmutableAttributes
         $written = [];
 
         foreach ($keys as $key) {
-            // Asking the public method keeps a model's override of it in charge.
-            if ($this->isImmutableAttribute($key)) {
-                $attribute = $this->immutableAttributeWrittenBy($key) ?? self::columnWrittenBy($key);
-                $written[$attribute] = $attribute;
+            foreach (self::keysWrittenBy($key) as $writtenKey) {
+                // Asking the public method keeps a model's override of it in charge.
+                if ($this->isImmutableAttribute($writtenKey)) {
+                    $attribute = $this->immutableAttributeWrittenBy($writtenKey) ?? self::columnWrittenBy($writtenKey);
+                    $written[$attribute] = $attribute;
+                }
             }
         }
 
         return array_values($written);
+    }
+
+    /**
+     * The key itself and, for a JSON path, the columns PostgreSQL and SQLite
+     * write instead: they look for the column at the last and at the first dot
+     * of the whole key, so "note->meta.options" writes "options" there.
+     *
+     * @return list<string>
+     */
+    private static function keysWrittenBy(string $key): array
+    {
+        if (! str_contains($key, '->')) {
+            return [$key];
+        }
+
+        return array_values(array_unique([
+            $key,
+            Str::before(Str::afterLast($key, '.'), '->'),
+            Str::before(str_replace('->', '.', Str::after($key, '.')), '.'),
+        ]));
     }
 
     /**

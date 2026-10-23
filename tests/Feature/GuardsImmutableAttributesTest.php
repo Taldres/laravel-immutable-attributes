@@ -258,6 +258,7 @@ describe('column name aliases', function () {
         'table prefix on save' => fn (Invoice $invoice) => $invoice->forceFill(['invoices.number' => 'INV-999'])->save(),
         'any qualifier on save' => fn (Invoice $invoice) => $invoice->forceFill(['anything.number' => 'INV-999'])->save(),
         'JSON path in increment extras' => fn (Invoice $invoice) => $invoice->increment('total', 1, ['options->currency' => 'USD']),
+        'JSON path with a dot in increment extras' => fn (Invoice $invoice) => $invoice->increment('total', 1, ['note->meta.options' => ['currency' => 'USD']]),
         'table prefix in increment extras' => fn (Invoice $invoice) => $invoice->increment('total', 1, ['invoices.number' => 'INV-999']),
         'any qualifier in increment extras' => fn (Invoice $invoice) => $invoice->increment('total', 1, ['anything.number' => 'INV-999']),
     ]);
@@ -287,6 +288,7 @@ describe('column name aliases', function () {
     })->with([
         'a table prefix' => [fn (Invoice $invoice) => $invoice->forceFill(['invoices.number' => 'INV-999'])->save(), ['number']],
         'a JSON path and its column' => [fn (Invoice $invoice) => $invoice->increment('total', 1, ['options->currency' => 'USD']), ['options']],
+        'a JSON path with a dot and the column after it' => [fn (Invoice $invoice) => $invoice->increment('total', 1, ['note->meta.options' => ['currency' => 'USD'], 'options->currency' => 'USD']), ['options']],
     ]);
 
     it('reports the column a key writes as immutable', function () {
