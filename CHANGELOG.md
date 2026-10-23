@@ -1,6 +1,26 @@
 # Release Notes
 
-## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.7.0...1.x)
+## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.8.0...1.x)
+
+## [v1.8.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.7.0...v1.8.0) - 2026-10-23
+
+#### Upgrade notes
+
+- **A JSON path key with a dot now throws when a column it reaches is immutable.** PostgreSQL and SQLite cut a key such as `note->meta.options` at a dot and write `options` instead of `note`. A write like `$invoice->increment('total', 1, ['note->meta.options' => [...]])`, or `Invoice::whereKey($id)->update(['note->meta.options' => [...]])` on a model that uses `GuardsImmutableQueries`, could therefore overwrite an immutable column. The guard now checks every column such a key can write, on every database, MySQL, MariaDB and SQL Server included. Write the JSON path without a dot after `->`, or update the JSON column as a whole.
+- Everything else stays as it is: keys without `->`, JSON paths such as `options->currency`, model saves, and `DB::table()`, `toBase()` and raw SQL.
+
+<!-- Release notes generated using configuration in .github/release.yml at 1.x -->
+### What's Changed
+
+#### Bug Fixes
+
+* Guard the columns a JSON path with a dot writes by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/46
+
+#### Documentation
+
+* Document where the guard ends by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/47
+
+**Full Changelog**: https://github.com/Taldres/laravel-immutable-attributes/compare/v1.7.0...v1.8.0
 
 ## [v1.7.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.6.0...v1.7.0) - 2026-10-23
 
