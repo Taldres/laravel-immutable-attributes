@@ -35,6 +35,7 @@ looks normal, and the damage shows up much later.
 - **Inserts are untouched.** The attributes are set freely until the row exists
 - **Saving the same value is not a change.** A save is checked with Eloquent's own dirty tracking, casts included. An increment is checked by the columns its query writes, because that query bypasses casts
 - **Eloquent queries on request.** Add `GuardsImmutableQueries` and `Invoice::whereKey($id)->update([...])`, `upsert()` and the other builder writes are checked too; `DB::table()` stays open for corrections
+- **A guardrail, not a lock.** It checks what goes through the model; writes around the model and changes the database makes itself need the database's own protection, see [Where the guard ends](#where-the-guard-ends)
 
 ## Requirements
 
@@ -426,6 +427,27 @@ public function update(array $values): int
 Larastan reads the builder from the model's `newEloquentBuilder()`, which is now
 the trait's, so it sees Laravel's builder. `HasBuilder` keeps `Invoice::query()`
 typed with your own.
+
+## Where the guard ends
+
+The package is a guardrail against mistakes in application code, not a
+security boundary. It checks the writes Eloquent makes for a model: saves and
+increments, and with `GuardsImmutableQueries` the queries that start from the
+model. Like Laravel's own model features, such as events, casts, `$fillable`
+and the soft delete scope, it does not see writes that go around the model:
+
+- `DB::table()`, `toBase()`, `getQuery()` and raw SQL, including a raw
+  expression in place of a column name
+- other applications and database clients
+- changes the database makes itself, such as a foreign key with
+  `ON UPDATE CASCADE`, a trigger or an update through a view
+- migrations that change data or column types
+
+Where a value must stay unchanged whoever writes it, enforce that in the
+database as well: with a trigger that rejects the update, or with column
+privileges that let the application's database user update only the columns
+that may change. The package still stops a mistake in the application first,
+with an exception that names the attribute.
 
 ## AI agents
 
