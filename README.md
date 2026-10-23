@@ -246,7 +246,10 @@ so a model that defines them needs the same aliasing and the trait's return
 type, `int|false`. A rejected increment leaves the model as it was.
 
 A key counts as the column it writes, whatever its qualifier: `invoices.number`
-counts as `number`, and `options->currency` counts as `options`. Case does not
+counts as `number`, and `options->currency` counts as `options`. A JSON path
+with a dot, such as `note->meta.options`, counts as both `note` and `options`:
+PostgreSQL and SQLite cut such a key at a dot and write the column they find
+there, so the guard checks both on every database. Case does not
 count either, so `NUMBER` is `number`, except on PostgreSQL, where Laravel quotes
 identifiers and `NUMBER` is a different column. SQLite folds ASCII case only, so
 there `CAFÉ` and `café` are two columns. Entries returned by
@@ -308,7 +311,8 @@ The builder checks these writes:
   and on a collection's `toQuery()`
 
 A key counts as the column it writes, as for the model: `invoices.number` is
-`number`, and `options->currency` is `options`. A qualifier is not compared
+`number`, `options->currency` is `options`, and a JSON path with a dot, such as
+`note->meta.options`, is `note` and `options`. A qualifier is not compared
 with the table, so a table alias such as `i.number` counts as well. On MySQL and
 MariaDB, an update over a join may write a column of the joined table; when
 that column shares its name with an immutable column, as `ledger_entries.number`

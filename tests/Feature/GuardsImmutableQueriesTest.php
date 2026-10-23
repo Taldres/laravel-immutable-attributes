@@ -135,6 +135,8 @@ describe('builder writes', function () {
         'update() of a qualified column' => [fn (Builder $query) => $query->update(['invoices.number' => 'INV-999']), ['number']],
         'update() of a column qualified with a table alias' => [fn (Builder $query) => $query->from('invoices as i')->update(['i.number' => 'INV-999']), ['number']],
         'update() of a JSON path' => [fn (Builder $query) => $query->update(['options->currency' => 'USD']), ['options']],
+        'update() of a JSON path with a dot, which PostgreSQL and SQLite write to the column after the dot' => [fn (Builder $query) => $query->update(['note->meta.options' => ['currency' => 'USD']]), ['options']],
+        'update() of a qualified JSON path, which SQLite writes to the column after the first dot' => [fn (Builder $query) => $query->update(['main.options.note->currency' => 'USD']), ['options']],
         'increment()' => [fn (Builder $query) => $query->increment('customer_id'), ['customer_id']],
         'increment() by zero' => [fn (Builder $query) => $query->increment('customer_id', 0), ['customer_id']],
         'decrement()' => [fn (Builder $query) => $query->decrement('customer_id'), ['customer_id']],
