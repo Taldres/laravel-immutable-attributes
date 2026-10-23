@@ -1,6 +1,29 @@
 # Release Notes
 
-## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.7.0...1.x)
+## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.8.0...1.x)
+
+## [v1.8.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.7.0...v1.8.0) - 2026-10-23
+
+<!-- Release notes generated using configuration in .github/release.yml at 1.x -->
+### What's Changed
+
+#### Bug Fixes
+
+* Guard the columns a JSON path with a dot writes by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/46
+
+#### Documentation
+
+* Document where the guard ends by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/47
+
+#### Other Changes
+
+* docs: update the changelog for v1.7.0 by @github-actions[bot] in https://github.com/Taldres/laravel-immutable-attributes/pull/45
+
+### New Contributors
+
+* @github-actions[bot] made their first contribution in https://github.com/Taldres/laravel-immutable-attributes/pull/45
+
+**Full Changelog**: https://github.com/Taldres/laravel-immutable-attributes/compare/v1.7.0...v1.8.0
 
 ## [v1.7.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.6.0...v1.7.0) - 2026-10-23
 
