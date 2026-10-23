@@ -44,6 +44,7 @@ jobs:
       # main requires passing checks, which a push by this workflow cannot
       # have, so the changelog goes through a pull request that a maintainer
       # merges (checks do not run on pull requests opened with GITHUB_TOKEN).
+      # The label keeps that pull request out of the next release notes.
       - name: Open a pull request with the updated changelog
         env:
           GH_TOKEN: ${{ github.token }}
@@ -60,6 +61,6 @@ jobs:
           git switch --create "$branch"
           git commit --message "docs: update the changelog for ${TAG}" -- CHANGELOG.md
           git push --force origin "$branch"
-          gh pr create --base "$BASE" --head "$branch" \
+          gh pr create --base "$BASE" --head "$branch" --label skip-changelog \
             --title "docs: update the changelog for ${TAG}" \
             --body "Generated from the release notes of ${TAG}."
