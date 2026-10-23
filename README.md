@@ -35,6 +35,7 @@ looks normal, and the damage shows up much later.
 - **Inserts are untouched.** The attributes are set freely until the row exists
 - **Saving the same value is not a change.** A save is checked with Eloquent's own dirty tracking, casts included. An increment is checked by the columns its query writes, because that query bypasses casts
 - **Eloquent queries on request.** Add `GuardsImmutableQueries` and `Invoice::whereKey($id)->update([...])`, `upsert()` and the other builder writes are checked too; `DB::table()` stays open for corrections
+- **A guardrail, not a lock.** It checks what goes through the model; writes around the model and changes the database makes itself need the database's own protection, see [Where the guard ends](#where-the-guard-ends)
 
 ## Requirements
 
@@ -250,8 +251,11 @@ needs the same aliasing and the trait's return type, `int|false`. A rejected
 increment leaves the model as it was.
 
 A key counts as the column it writes, whatever its qualifier: `invoices.number`
-counts as `number`, and `options->currency` counts as `options`. Entries
-returned by `getImmutableAttributes()` are matched the same way, so
+counts as `number`, and `options->currency` counts as `options`. A JSON path
+with a dot, such as `note->meta.options`, counts as both `note` and `options`:
+PostgreSQL and SQLite cut such a key at a dot and write the column they find
+there, so the guard checks both on every database. Entries returned by
+`getImmutableAttributes()` are matched the same way, so
 `'options->currency'` there guards the whole `options` column. The exception
 names the attribute as declared.
 
@@ -316,7 +320,8 @@ The builder checks these writes:
   and on a collection's `toQuery()`
 
 A key counts as the column it writes, as for the model: `invoices.number` is
-`number`, and `options->currency` is `options`. A qualifier is not compared
+`number`, `options->currency` is `options`, and a JSON path with a dot, such as
+`note->meta.options`, is `note` and `options`. A qualifier is not compared
 with the table, so a table alias such as `i.number` counts as well. On MySQL and
 MariaDB, an update over a join may write a column of the joined table; when
 that column shares its name with an immutable column, as `ledger_entries.number`
@@ -433,6 +438,27 @@ public function update(array $values): int
 Larastan reads the builder from the model's `newEloquentBuilder()`, which is now
 the trait's, so it sees Laravel's builder. `HasBuilder` keeps `Invoice::query()`
 typed with your own.
+
+## Where the guard ends
+
+The package is a guardrail against mistakes in application code, not a
+security boundary. It checks the writes Eloquent makes for a model: saves and
+increments, and with `GuardsImmutableQueries` the queries that start from the
+model. Like Laravel's own model features, such as events, casts, `$fillable`
+and the soft delete scope, it does not see writes that go around the model:
+
+- `DB::table()`, `toBase()`, `getQuery()` and raw SQL, including a raw
+  expression in place of a column name
+- other applications and database clients
+- changes the database makes itself, such as a foreign key with
+  `ON UPDATE CASCADE`, a trigger or an update through a view
+- migrations that change data or column types
+
+Where a value must stay unchanged whoever writes it, enforce that in the
+database as well: with a trigger that rejects the update, or with column
+privileges that let the application's database user update only the columns
+that may change. The package still stops a mistake in the application first,
+with an exception that names the attribute.
 
 ## AI agents
 
