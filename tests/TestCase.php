@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Taldres\ImmutableAttributes\Tests;
 
 use Orchestra\Testbench\TestCase as Orchestra;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Builders\CountingBuilder;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\ConfiguredInvoice;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\QueryLockedInvoice;
+use Taldres\ImmutableAttributes\Tests\Fixtures\Models\QueryTouchingLedgerEntry;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\RestampedInvoice;
 use Taldres\ImmutableAttributes\Tests\Fixtures\Models\UnusableInvoice;
 
@@ -22,6 +25,8 @@ abstract class TestCase extends Orchestra
         ConfiguredInvoice::$loose = [];
         RestampedInvoice::$updatedAtColumn = 'updated_at';
         UnusableInvoice::$returned = [];
+        CountingBuilder::$updates = 0;
+        QueryTouchingLedgerEntry::$parent = QueryLockedInvoice::class;
 
         parent::tearDown();
     }

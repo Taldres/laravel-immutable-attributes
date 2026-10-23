@@ -20,6 +20,7 @@ return new class extends Migration
             $table->string('note')->nullable();
             $table->json('options')->nullable();
             $table->timestamps();
+            $table->softDeletes();
         });
 
         Schema::create('ledger_entries', function (Blueprint $table): void {
@@ -29,10 +30,16 @@ return new class extends Migration
             $table->string('memo')->nullable();
             $table->softDeletes();
         });
+
+        Schema::create('invoice_ledger_entry', function (Blueprint $table): void {
+            $table->unsignedBigInteger('invoice_id');
+            $table->unsignedBigInteger('ledger_entry_id');
+        });
     }
 
     public function down(): void
     {
+        Schema::dropIfExists('invoice_ledger_entry');
         Schema::dropIfExists('ledger_entries');
         Schema::dropIfExists('invoices');
     }

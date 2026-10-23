@@ -165,19 +165,32 @@ trait GuardsImmutableAttributes
      */
     protected function guardImmutableAttributes(array $keys): void
     {
-        $changed = [];
+        $changed = $this->immutableAttributesAmong($keys);
+
+        if ($changed !== []) {
+            throw ImmutableAttributeException::on($this, $changed);
+        }
+    }
+
+    /**
+     * The immutable attributes the keys write, each named once as declared.
+     *
+     * @param  list<string>  $keys
+     * @return list<string>
+     */
+    protected function immutableAttributesAmong(array $keys): array
+    {
+        $written = [];
 
         foreach ($keys as $key) {
             // Asking the public method keeps a model's override of it in charge.
             if ($this->isImmutableAttribute($key)) {
                 $attribute = $this->immutableAttributeWrittenBy($key) ?? self::columnWrittenBy($key);
-                $changed[$attribute] = $attribute;
+                $written[$attribute] = $attribute;
             }
         }
 
-        if ($changed !== []) {
-            throw ImmutableAttributeException::on($this, array_values($changed));
-        }
+        return array_values($written);
     }
 
     /**
