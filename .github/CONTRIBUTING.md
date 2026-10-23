@@ -7,8 +7,9 @@ For significant changes, please open an issue first so we can discuss the approa
 ## Scope
 
 This package deliberately stays small: it guards attributes on the Eloquent save
-path and nothing else. Auditing, versioning, approval workflows or guards on
-query builder writes are out of scope; build them as separate packages.
+path and, for models that opt in, on Eloquent builder writes. Auditing,
+versioning, approval workflows or guards on `DB::table()` and raw SQL are out of
+scope; build them as separate packages.
 
 ## Process
 
