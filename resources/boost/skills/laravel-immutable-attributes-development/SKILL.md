@@ -98,6 +98,10 @@ class Invoice extends Model
 - a runtime `getImmutableAttributes()` is asked on a new, empty model, even for
   `toQuery()`, so a rule based on `getOriginal()` sees a row that is not finalized
 - `DB::table()`, `toBase()`, `getQuery()` and raw SQL are never checked
+- the package is a guardrail against mistakes in application code, not a
+  security boundary: other clients, foreign key cascades, triggers and updates
+  through a view bypass it, so where a value must stay unchanged whoever writes
+  it, recommend a database trigger or column privileges in addition
 - a custom builder must extend `Taldres\ImmutableAttributes\Builders\ImmutableBuilder`
   or use `Taldres\ImmutableAttributes\Concerns\GuardsImmutableWrites`; name it
   with `protected static string $builder`, `#[UseEloquentBuilder]` or
@@ -126,4 +130,4 @@ class Invoice extends Model
 - do not override a write method such as `update()` in a builder that uses `GuardsImmutableWrites` without aliasing the trait method and calling it; keep its return type
 - do not override `getDirtyForUpdate()` on a guarded model without aliasing the trait method and calling it; `parent::getDirtyForUpdate()` skips the guard
 - the same applies to `incrementOrDecrement()` and `incrementOrDecrementEach()`: the trait overrides them to check the columns an increment writes, even without events, so keep their `int|false` return type
-- a key counts as the column it writes, whatever its qualifier (`invoices.number` counts as `number`, `options->currency` as `options`); an immutable attribute matches in any case on every database (`NUMBER` counts as `number`), while a column left out with `except` only under its exact name, so write it with the case it is declared in; `#[Immutable]` itself rejects JSON paths, so declare the whole column
+- a key counts as the column it writes, whatever its qualifier (`invoices.number` counts as `number`, `options->currency` as `options`, and a JSON path with a dot such as `note->meta.options` as both `note` and `options`, because PostgreSQL and SQLite write `options`); an immutable attribute matches in any case on every database (`NUMBER` counts as `number`), while a column left out with `except` only under its exact name, so write it with the case it is declared in; `#[Immutable]` itself rejects JSON paths, so declare the whole column
