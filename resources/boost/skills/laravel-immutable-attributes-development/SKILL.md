@@ -98,6 +98,10 @@ class Invoice extends Model
 - a runtime `getImmutableAttributes()` is asked on a new, empty model, even for
   `toQuery()`, so a rule based on `getOriginal()` sees a row that is not finalized
 - `DB::table()`, `toBase()`, `getQuery()` and raw SQL are never checked
+- the package is a guardrail against mistakes in application code, not a
+  security boundary: other clients, foreign key cascades, triggers and updates
+  through a view bypass it, so where a value must stay unchanged whoever writes
+  it, recommend a database trigger or column privileges in addition
 - a custom builder must extend `Taldres\ImmutableAttributes\Builders\ImmutableBuilder`
   or use `Taldres\ImmutableAttributes\Concerns\GuardsImmutableWrites`; name it
   with `protected static string $builder`, `#[UseEloquentBuilder]` or
