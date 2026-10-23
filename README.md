@@ -34,6 +34,7 @@ looks normal, and the damage shows up much later.
 - **Covers the paths a listener misses.** Saves and increments without events (`saveQuietly()`, `incrementQuietly()`, `withoutEvents()`) and changes made by a later `updating` listener or observer are caught too
 - **Inserts are untouched.** The attributes are set freely until the row exists
 - **Saving the same value is not a change.** A save is checked with Eloquent's own dirty tracking, casts included. An increment is checked by the columns its query writes, because that query bypasses casts
+- **Eloquent queries on request.** Add `GuardsImmutableQueries` and `Invoice::whereKey($id)->update([...])`, `upsert()` and the other builder writes are checked too; `DB::table()` stays open for corrections
 
 ## Requirements
 
@@ -201,18 +202,19 @@ another column.
 
 | Guarded | Not guarded |
 | --- | --- |
-| `save()`, `update()`, `push()` | Query builder writes: `Invoice::whereKey($id)->update([...])`, `upsert()`, raw queries |
-| `fill()` and `forceFill()` followed by a save | `increment()` and `decrement()` on a model that does not exist yet, which Laravel runs as a query on the whole table |
+| `save()`, `update()`, `push()` | Eloquent builder writes: `Invoice::whereKey($id)->update([...])`, `upsert()`, unless the model [guards its queries](#guarding-eloquent-queries) |
+| `fill()` and `forceFill()` followed by a save | `increment()` and `decrement()` on a model that does not exist yet, which Laravel runs as a query on the whole table, unless the model guards its queries |
 | `saveQuietly()`, `updateQuietly()` and saves inside `Model::withoutEvents()` | Deleting and soft deleting |
-| Changes made by `updating` listeners and observers | Parent timestamps touched through `$touches` |
-| `increment()` and `decrement()`, including the extra columns and the update timestamp they write; an immutable extra column throws even with its current value | `incrementEach()` and `decrementEach()` before Laravel 13.3, which Laravel runs as a query on the whole table |
-| `incrementQuietly()` and `decrementQuietly()`, and `increment()` and `decrement()` inside `Model::withoutEvents()` | |
-| `incrementEach()` and `decrementEach()` on Laravel 13.3 and later, and on Laravel 13.20 and later their `Quietly` variants | |
+| Changes made by `updating` listeners and observers | Parent timestamps touched through `$touches`, unless the parent guards its queries |
+| `increment()` and `decrement()`, including the extra columns and the update timestamp they write; an immutable extra column throws even with its current value | |
+| `incrementQuietly()` and `decrementQuietly()`, and `increment()` and `decrement()` inside `Model::withoutEvents()` | `DB::table()`, `toBase()` and raw queries |
+| `incrementEach()` and `decrementEach()` on Laravel 13.3 and later, and on Laravel 13.20 and later their `Quietly` variants | `incrementEach()` and `decrementEach()` before Laravel 13.3, which Laravel runs as a query on the whole table, unless the model guards its queries |
 | `touch()` when the touched column is immutable, such as `updated_at` under `#[ImmutableModel]` | |
 | `restore()` when `deleted_at` is immutable, such as under `#[ImmutableModel]` | |
 
-The query builder stays open on purpose: it is the escape hatch for deliberate
-corrections, data migrations and erasure.
+Without `GuardsImmutableQueries`, the Eloquent builder stays open on purpose:
+it is the escape hatch for deliberate corrections, data migrations and erasure.
+With it, `DB::table()` takes that role.
 
 An attribute that was not selected, as with `select('id', 'paid')`, counts as
 changed once you set it, even to the stored value.
@@ -255,6 +257,175 @@ declared.
 An increment by `0` of an immutable column throws as well. Its query still
 writes the column, and the database turns the value into a number, so `001` in
 a text column becomes `1`.
+
+### Guarding Eloquent queries
+
+`GuardsImmutableAttributes` checks what a model saves. Writes through the
+Eloquent builder never load a model, so it does not see them. Add
+`GuardsImmutableQueries` to check those too:
+
+```php
+use Taldres\ImmutableAttributes\Concerns\GuardsImmutableAttributes;
+use Taldres\ImmutableAttributes\Concerns\GuardsImmutableQueries;
+
+#[Immutable('number')]
+class Invoice extends Model
+{
+    use GuardsImmutableAttributes;
+    use GuardsImmutableQueries;
+}
+
+Invoice::whereKey($id)->update(['number' => 'INV-999']); // ImmutableAttributeException, nothing is written
+Invoice::whereKey($id)->update(['paid' => true]);        // allowed
+```
+
+The trait needs `GuardsImmutableAttributes`, on the model or a parent; without
+it PHP refuses the class. The model's declarations, `except` and the rules for
+column names apply unchanged.
+
+The two traits check different things:
+
+- **The model compares.** A save throws only when an immutable attribute
+  changed; saving the stored value passes.
+- **The builder forbids.** A query throws as soon as it writes an immutable
+  column, whatever the value, because it does not load the rows it writes. The
+  check runs no query of its own, and the exception's `key` is `null`.
+
+The builder checks these writes:
+
+- `update()`, including the update timestamp the Eloquent builder adds to it
+- `increment()`, `decrement()`, `incrementEach()` and `decrementEach()`, with
+  their extra columns and, where the Eloquent builder writes it, the update
+  timestamp; an amount of `0` counts as a write
+- `upsert()`: new rows may set immutable columns, the columns updated on a
+  conflict may not. Without its third argument, `upsert()` updates every column
+  it is given, so pass the columns to update. The update timestamp counts, even
+  with an empty list
+- `updateOrInsert()` when the row exists; Laravel's own existence query runs
+  first, an insert may set immutable columns
+- `touch()` and `updateFrom()`
+- the same calls on a relation, such as `$customer->invoices()->update([...])`,
+  and on a collection's `toQuery()`
+
+A key counts as the column it writes, as for the model: `invoices.number` is
+`number`, and `options->currency` is `options`. A qualifier is not compared
+with the table, so a table alias such as `i.number` counts as well. On MySQL and
+MariaDB, an update over a join may write a column of the joined table; when
+that column shares its name with an immutable column, as `ledger_entries.number`
+would, the builder rejects it too. Write it through the joined model's query
+instead.
+
+Inserts and deletes pass. A soft delete passes as well, from the model or from
+the builder, as long as the update writes nothing but a deletion timestamp and
+the update timestamp. When one of them is immutable, the soft delete reaches
+only rows that are not deleted yet, whatever else the query selects, so a
+deletion timestamp that is set stays as it is. Restoring through the builder throws when `deleted_at` is immutable,
+as `restore()` on the model does.
+
+Writes through `DB::table()`, `Invoice::query()->toBase()`, `getQuery()` and
+raw SQL are not checked; they are the escape hatch for deliberate corrections. A raw expression
+in place of a column name, as in the update list of `upsert()`, is not
+inspected either.
+
+Some writes that the model guard leaves alone run through the builder, so the
+builder now checks them:
+
+- `increment()` and `decrement()` on a model that does not exist yet, and
+  `incrementEach()` and `decrementEach()` before Laravel 13.3, which Laravel
+  runs on the whole table
+- a relation that touches this model when the update timestamp is immutable,
+  such as a child's `$touches` or a `belongsToMany()` relation that touches.
+  The child is saved before the exception, so wrap the save in a transaction,
+  leave `updated_at` out of the guard, or use `Model::withoutTouchingOn()`
+
+The model's own saves and increments pass through the builder as well. The
+model guard has checked them by then, so they behave as before, with one
+exception: a save in the same second as the stored update timestamp leaves
+`updated_at` unchanged on the model, but the builder still writes it. With
+`updated_at` immutable, that save now throws, as every later save already did.
+
+The builder has no row to look at. An override of `getImmutableAttributes()`
+that depends on the stored state, such as `getOriginal('finalized_at')`, is
+asked on a new, empty model and returns the list for a row that is not
+finalized. That holds for a query that starts from a loaded model as well, such
+as a collection's `toQuery()`.
+
+#### Custom builders
+
+`GuardsImmutableQueries` puts `Taldres\ImmutableAttributes\Builders\ImmutableBuilder`
+in place of Laravel's builder. A builder the model names itself, with the static
+`$builder` property, `#[UseEloquentBuilder]` or Laravel's `HasBuilder`, stays in
+place, but it has to guard its writes. Extend `ImmutableBuilder`:
+
+```php
+use Taldres\ImmutableAttributes\Builders\ImmutableBuilder;
+
+class InvoiceBuilder extends ImmutableBuilder
+{
+    public function unpaid(): static
+    {
+        return $this->where('paid', false);
+    }
+}
+
+class Invoice extends Model
+{
+    use GuardsImmutableAttributes;
+    use GuardsImmutableQueries;
+
+    protected static string $builder = InvoiceBuilder::class;
+}
+```
+
+A builder that extends another base, such as one from a package, uses the trait
+instead:
+
+```php
+use Taldres\ImmutableAttributes\Concerns\GuardsImmutableWrites;
+
+class InvoiceBuilder extends SomePackageBuilder
+{
+    use GuardsImmutableWrites;
+}
+```
+
+A builder without either is not replaced: the first query throws a
+`LogicException` that names it. A model that defines its own
+`newEloquentBuilder()` throws one when it boots, because that method would
+replace the one that picks the builder; name the builder with `$builder`
+instead. With `HasBuilder`, both traits define `newEloquentBuilder()`, so pick
+this package's:
+
+```php
+use HasBuilder, GuardsImmutableQueries {
+    GuardsImmutableQueries::newEloquentBuilder insteadof HasBuilder;
+}
+```
+
+The builder checks only models that use `GuardsImmutableQueries`. A builder
+shared with models without it writes for them as before.
+
+A builder that overrides `update()`, `upsert()`, `touch()`, `increment()`,
+`decrement()`, `incrementEach()`, `decrementEach()`, `updateOrInsert()` or
+`updateFrom()` replaces the trait's method. Alias the trait method and call it,
+as for `getDirtyForUpdate()` above, and keep its return type:
+
+```php
+use GuardsImmutableWrites {
+    update as guardedUpdate;
+}
+
+public function update(array $values): int
+{
+    // Your own adjustments.
+
+    return $this->guardedUpdate($values);
+}
+```
+
+Larastan reads the builder from the model's `newEloquentBuilder()`, which is now
+the trait's, so it sees Laravel's builder. `HasBuilder` keeps `Invoice::query()`
+typed with your own.
 
 ## AI agents
 
