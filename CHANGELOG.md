@@ -1,6 +1,28 @@
 # Release Notes
 
-## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.6.0...1.x)
+## [Unreleased](https://github.com/taldres/laravel-immutable-attributes/compare/v1.7.0...1.x)
+
+## [v1.7.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.6.0...v1.7.0) - 2026-10-23
+
+#### Upgrade notes
+
+- **Nothing changes unless a model opts in.** Models that only use `GuardsImmutableAttributes` behave as before, and their query writes such as `Invoice::whereKey($id)->update([...])` stay unguarded.
+- **With `GuardsImmutableQueries`, touching a guarded parent can throw.** When `updated_at` is immutable, `$touches` and `belongsToMany()->touch()` reach the parent through its query and throw after the child is saved. Wrap the save in a transaction, leave `updated_at` out of the guard, or use `Model::withoutTouchingOn()`.
+- **A custom builder of an opted-in model must guard its writes.** Extend `ImmutableBuilder` or use `GuardsImmutableWrites` in it, otherwise the model throws a `LogicException`. A model that uses Laravel's `HasBuilder` resolves `newEloquentBuilder()` with `insteadof`, as the README shows.
+
+<!-- Release notes generated using configuration in .github/release.yml at 1.x -->
+### What's Changed
+
+#### Enhancements
+
+* Guard Eloquent query writes on models that opt in by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/43
+
+#### Maintenance
+
+* Run the weekly tests of every branch from one workflow by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/35
+* Open a pull request for the changelog by @Taldres in https://github.com/Taldres/laravel-immutable-attributes/pull/40
+
+**Full Changelog**: https://github.com/Taldres/laravel-immutable-attributes/compare/v1.6.0...v1.7.0
 
 ## [v1.6.0](https://github.com/taldres/laravel-immutable-attributes/compare/v1.5.0...v1.6.0) - 2026-10-15
 
