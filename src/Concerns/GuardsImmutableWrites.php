@@ -46,8 +46,8 @@ trait GuardsImmutableWrites
      * New rows may set immutable columns; only the columns written on a
      * conflict are checked, as Laravel picks them when $update is null.
      *
-     * @param  array<array-key, mixed>  $values
-     * @param  array<array-key, mixed>|string  $uniqueBy
+     * @param  array<array-key, array<string, mixed>|scalar|object|null>  $values
+     * @param  array<int, string>|string  $uniqueBy
      * @param  array<array-key, mixed>|null  $update
      */
     public function upsert(array $values, $uniqueBy, $update = null): int
