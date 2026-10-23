@@ -3,9 +3,9 @@ name: laravel-immutable-attributes-development
 description: >
   Protect Eloquent columns that must not change after insert with
   taldres/laravel-immutable-attributes: declare them with #[Immutable] or
-  #[ImmutableModel], handle
-  ImmutableAttributeException, and make deliberate corrections through the
-  query builder.
+  #[ImmutableModel], optionally guard Eloquent builder writes with
+  GuardsImmutableQueries, handle ImmutableAttributeException, and make
+  deliberate corrections through the query builder.
 license: MIT
 metadata:
   author: Dennis Petersmann
@@ -76,10 +76,39 @@ class Invoice extends Model
 - the model keeps its unsaved changes; `refresh()` discards them, and until then
   every save of that model throws, including an `increment()` of another column
 
-### 4. Deliberate corrections
+### 4. Guard Eloquent queries (optional)
 
-- write through the query builder, which the guard does not cover:
-  `Invoice::query()->whereKey($id)->update(['number' => $corrected])`
+- add `use GuardsImmutableQueries;` next to `GuardsImmutableAttributes` when
+  mass updates, `upsert()` or relation updates must not write the columns
+  either; it needs `GuardsImmutableAttributes` on the model or a parent
+- the builder rejects any write of an immutable column, even with the stored
+  value, before the query runs and without loading rows; the exception's `key`
+  is `null`
+- checked: `update()`, `increment()`, `decrement()`, `incrementEach()`,
+  `decrementEach()` with extra columns and the update timestamp the Eloquent
+  builder adds, `touch()`, `updateFrom()`, `updateOrInsert()` on an existing
+  row, and the columns `upsert()` updates on a conflict; inserts, deletes and
+  soft deletes pass, a soft delete never rewrites an immutable deletion
+  timestamp that is set, and a restore through the builder is checked
+- pass the update columns to `upsert()`; without them it updates every column
+  given and throws
+- with it, an `increment()` on a model that does not exist yet and a relation
+  that touches this model when `updated_at` is immutable throw as well; the
+  child is saved first, so use a transaction or `Model::withoutTouchingOn()`
+- a runtime `getImmutableAttributes()` is asked on a new, empty model, even for
+  `toQuery()`, so a rule based on `getOriginal()` sees a row that is not finalized
+- `DB::table()`, `toBase()`, `getQuery()` and raw SQL are never checked
+- a custom builder must extend `Taldres\ImmutableAttributes\Builders\ImmutableBuilder`
+  or use `Taldres\ImmutableAttributes\Concerns\GuardsImmutableWrites`; name it
+  with `protected static string $builder`, `#[UseEloquentBuilder]` or
+  `HasBuilder` (with `GuardsImmutableQueries::newEloquentBuilder insteadof HasBuilder`);
+  a builder without the guard throws a `LogicException` on the first query
+
+### 5. Deliberate corrections
+
+- write through `DB::table('invoices')`, which no guard covers, or through
+  `Invoice::query()` when the model does not use `GuardsImmutableQueries`:
+  `DB::table('invoices')->where('id', $id)->update(['number' => $corrected])`
 - keep such writes in one explicit place (an action, command or migration)
 
 ## Examples
@@ -92,7 +121,9 @@ class Invoice extends Model
 - do not add an `updating` listener that re-implements the check
 - do not catch `ImmutableAttributeException` to retry the same save
 - do not route normal application writes through the query builder to get around the guard
-- do not rely on the guard for mass updates, `$touches`, deletes or an `increment()` on a model that does not exist yet, which Laravel runs as a query on the whole table; it does not cover them
+- without `GuardsImmutableQueries`, do not rely on the guard for mass updates, `$touches` or an `increment()` on a model that does not exist yet, which Laravel runs as a query on the whole table; it does not cover them; deletes are never covered
+- do not define `newEloquentBuilder()` on a model that uses `GuardsImmutableQueries`; it throws a `LogicException` when the model boots, so name the builder with `$builder` instead
+- do not override a write method such as `update()` in a builder that uses `GuardsImmutableWrites` without aliasing the trait method and calling it; keep its return type
 - do not override `getDirtyForUpdate()` on a guarded model without aliasing the trait method and calling it; `parent::getDirtyForUpdate()` skips the guard
 - the same applies to `incrementOrDecrement()` and `incrementOrDecrementEach()`: the trait overrides them to check the columns an increment writes, even without events, so keep their `int|false` return type
 - a key counts as the column it writes, whatever its qualifier (`invoices.number` counts as `number`, `options->currency` as `options`); an immutable attribute matches in any case on every database (`NUMBER` counts as `number`), while a column left out with `except` only under its exact name, so write it with the case it is declared in; `#[Immutable]` itself rejects JSON paths, so declare the whole column
